@@ -1,3 +1,5 @@
+use super::schema::users;
+
 #[derive(Queryable)]
 pub struct Meme {
     pub memeid: i32,
@@ -13,5 +15,12 @@ pub struct User {
     pub username: String,
     pub userupvote: i32,
     pub userdownvote: i32,
-    pub testbool: bool,
+}
+
+#[derive(Insertable)]
+#[table_name="users"]
+pub struct NewUser<'a> {
+    pub username: &'a str,
+    pub userupvote: i32,
+    pub userdownvote: i32,
 }

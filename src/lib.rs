@@ -6,6 +6,7 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
+use self::models::{NewUser,User};
 
 pub mod schema;
 pub mod models;
@@ -21,6 +22,19 @@ pub fn establish_connection() -> PgConnection {
         .expect(&format!("Error connecting to database {}", db_url))
 }
 
+pub fn create_user(conn: &PgConnection, username: &str) -> User {
+    use schema::users;
+
+    let new_user = NewUser {
+        username: username,
+        userupvote: 0,
+        userdownvote: 0,
+    };
+    diesel::insert_into(users::table)
+        .values(&new_user)
+        .get_result(conn)
+        .expect("Error saving post!")
+}
 
 
 

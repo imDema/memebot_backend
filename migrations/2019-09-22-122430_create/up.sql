@@ -3,8 +3,7 @@ CREATE TABLE users (
     userid SERIAL PRIMARY KEY,
     username VARCHAR NOT NULL,
     userupvote INTEGER NOT NULL,
-    userdownvote INTEGER NOT NULL,
-    testbool BOOLEAN NOT NULL
+    userdownvote INTEGER NOT NULL
 );
 
 CREATE TABLE memes (

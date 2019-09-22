@@ -14,7 +14,6 @@ table! {
         username -> Varchar,
         userupvote -> Int4,
         userdownvote -> Int4,
-        testbool -> Bool,
     }
 }
 
