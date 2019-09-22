@@ -3,11 +3,8 @@ table! {
         memeid -> Int4,
         author -> Int4,
         image -> Varchar,
-        image_data -> Bytea,
         upvote -> Int4,
-        downvte -> Int4,
-        date -> Timestamp,
-        heat -> Nullable<Float8>,
+        downvote -> Int4,
     }
 }
 
@@ -15,8 +12,9 @@ table! {
     users (userid) {
         userid -> Int4,
         username -> Varchar,
-        userupvote -> Nullable<Int4>,
-        userdownvote -> Nullable<Int4>,
+        userupvote -> Int4,
+        userdownvote -> Int4,
+        testbool -> Bool,
     }
 }
 

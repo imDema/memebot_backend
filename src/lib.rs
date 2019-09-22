@@ -10,6 +10,7 @@ use std::env;
 pub mod schema;
 pub mod models;
 
+///Read database url from .env and connect to it
 pub fn establish_connection() -> PgConnection {
     dotenv().ok();
 
@@ -25,8 +26,4 @@ pub fn establish_connection() -> PgConnection {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

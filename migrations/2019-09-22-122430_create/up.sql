@@ -2,17 +2,18 @@
 CREATE TABLE users (
     userid SERIAL PRIMARY KEY,
     username VARCHAR NOT NULL,
-    userupvote INTEGER,
-    userdownvote INTEGER
+    userupvote INTEGER NOT NULL,
+    userdownvote INTEGER NOT NULL,
+    testbool BOOLEAN NOT NULL
 );
 
 CREATE TABLE memes (
     memeid SERIAL PRIMARY KEY,
     author INTEGER NOT NULL REFERENCES users(userid),
     image VARCHAR NOT NULL,
-    image_data BYTEA NOT NULL,
+    --image_data BYTEA NOT NULL,
     upvote INTEGER NOT NULL,
-    downvte INTEGER NOT NULL,
-    date TIMESTAMP NOT NULL,
-    heat FLOAT8
+    downvote INTEGER NOT NULL
+    --date TIMESTAMP NOT NULL,
+    --heat FLOAT8
 );
