@@ -1,18 +1,18 @@
 -- Your SQL goes here
-CREATE TABLE users {
+CREATE TABLE users (
     userid SERIAL PRIMARY KEY,
     username VARCHAR NOT NULL,
-    userupvote INTEGER NOT NULL,
-    userdownvote INTEGER NOT NULL,
-}
+    userupvote INTEGER,
+    userdownvote INTEGER
+);
 
-CREATE TABLE memes {
+CREATE TABLE memes (
     memeid SERIAL PRIMARY KEY,
-    FOREIGN KEY (author) INTEGER REFERENCES users(userid),
+    author INTEGER NOT NULL REFERENCES users(userid),
     image VARCHAR NOT NULL,
-    image_data BLOB NOT NULL,
+    image_data BYTEA NOT NULL,
     upvote INTEGER NOT NULL,
     downvte INTEGER NOT NULL,
     date TIMESTAMP NOT NULL,
-    heat FLOAT8 NOT NULL,
-}
+    heat FLOAT8
+);
