@@ -36,7 +36,13 @@ pub fn create_user(conn: &PgConnection, username: &str) -> User {
         .expect("Error saving post!")
 }
 
-
+pub fn user_increase_upvote(conn: &PgConnection, id: i32) {
+    use schema::users::dsl::{users, userupvote};
+    diesel::update(users.find(id))
+        .set(userupvote.eq(userupvote + 1))
+        .execute(conn)
+        .expect(&format!("Can't find user {}", id));
+}
 
 #[cfg(test)]
 mod tests {
