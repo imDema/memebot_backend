@@ -6,7 +6,7 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::env;
-use self::models::{NewUser,User};
+use self::models::{NewUser,User,NewMeme, Meme};
 
 pub mod schema;
 pub mod models;
@@ -33,7 +33,30 @@ pub fn create_user(conn: &PgConnection, username: &str) -> User {
     diesel::insert_into(users::table)
         .values(&new_user)
         .get_result(conn)
-        .expect("Error saving post!")
+        .expect("Error creating user!")
+}
+
+pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
+    use schema::memes;
+    let mm : Meme = diesel::insert_into(memes::table)
+        .values(&meme)
+        .get_result(conn)
+        .expect("Error creating meme!");
+    println!("Created user: {:?}", mm);
+}
+
+pub fn like_meme(conn: &PgConnection, memeid: i32) {
+    use schema::{users, memes};
+    let meme: Meme = diesel::update(memes::table.filter(memes::dsl::memeid.eq(memeid)))
+        .set(memes::dsl::upvote.eq(memes::dsl::upvote + 1))
+        .get_result(conn)
+        .expect("Error increasing meme upvotes");
+
+    diesel::update(users::table.filter(users::dsl::userid.eq(meme.author)))
+        .set(users::dsl::userupvote.eq(users::dsl::userupvote + 1))
+        .execute(conn)
+        .expect(&format!("Error increasing user upvotes for meme {:?}", meme));
+
 }
 
 pub fn user_increase_upvote(conn: &PgConnection, id: i32) {

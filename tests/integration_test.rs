@@ -5,15 +5,21 @@ use diesel::prelude::*;
 #[test]
 fn test_switcher() {
     let mut input = String::new();
+    let conn = establish_connection();
     loop {
-        println!("\ncu: create user\tlu: load users\nau: add upvote\tdu: delete user\n\\end to end\n");
+        println!("
+        newuser: new meme\tnewmeme: new meme
+        print: print all\tupv: upvote meme
+        delmeme: delete meme
+        \\end to end\n");
         std::io::stdin().read_line(&mut input).unwrap();
 
         match input.trim_end() {
-            "cu" => create_user_test(),
-            "lu" => load_test(),
-            "au" => add_upv_test(),
-            "du" => delete_user_test(),
+            "newusr" => create_user_test(&conn),
+            "newmeme" => load_test(&conn),
+            "newuser" => create_meme_test(&conn),
+            "upv" => add_upv_test(&conn),
+            "delmeme" => delete_meme_test(&conn),
             "\\end" => break,
             _ => println!("Invalid command"),
         }
@@ -22,41 +28,46 @@ fn test_switcher() {
     }
 }
 
-#[test]
-fn create_user_test() {
-    let conn = establish_connection();
+fn create_user_test(conn: &PgConnection) {
     let mut name = String::new();
-    loop {
-        println!("Insert name of user to create, \\end to end");
-        std::io::stdin().read_line(&mut name).unwrap();
-        if name.trim_end() == "\\end" {
-            break;
-        }
-        create_user(&conn, &name[..name.len()-1]);
-        name.truncate(0);
-    }
+    println!("Insert name of user to create");
+    std::io::stdin().read_line(&mut name).unwrap();
+    create_user(conn, &name[..name.len()-1]);
 }
 
-#[test]
-fn load_test() {
-    use memebot_backend::schema::users::dsl::*;
+fn create_meme_test(conn: &PgConnection) {
+    let mut name = String::new();
+    println!("Insert in IMAGE AUTHORID");
+    std::io::stdin().read_line(&mut name).unwrap();
 
-    let conn = establish_connection();
-    let results = users
-        .load::<User>(&conn)
+
+    create_user(conn, &name[..name.len()-1]);
+}
+
+fn load_test(conn: &PgConnection) {
+    use memebot_backend::schema::{users,memes};
+
+    let results = users::table
+        .load::<User>(conn)
         .expect("Error loading users!");
 
     for user in results {
-        println!("---------------------\nuserid:{}\nusername:{}\nupv:{}\ndwv:{}", user.userid, user.username, user.userupvote, user.userdownvote);
+        println!("---------------------\nuserid:{}\tusername:{}\nupv:{}\tdwv:{}", user.userid, user.username, user.userupvote, user.userdownvote);
+        let memeresults = memes::table
+            .filter(memes::dsl::author.eq(user.userid))
+            .load::<Meme>(conn)
+            .expect("Error loading memes!");
+
+        for meme in memeresults {
+            println!("++++++++++++++++\tmemeid:{}\timage:{}\n\tupv:{}\tdwv:{}", meme.memeid, meme.image, meme.upvote, meme.downvote);
+        }
     }
 }
 
-#[test]
-fn add_upv_test() {
-    let conn = establish_connection();
+fn add_upv_test(conn: &PgConnection) {
     let mut input = String::new();
     loop {
-        println!("Insert name of user id to give upvote to, \\end to end");
+        println!("Insert id of meme to upvote, \\end to end");
         std::io::stdin().read_line(&mut input).unwrap();
 
         if input.trim_end() == "\\end" {
@@ -64,28 +75,20 @@ fn add_upv_test() {
         }
         let id = input.trim_end().parse::<i32>().expect("Invalid id");
 
-        user_increase_upvote(&conn, id);
+        user_increase_upvote(conn, id);
         input.truncate(0);
     }
 }
 
-#[test]
-fn delete_user_test() {
-    use schema::users::dsl::*;
-    let conn = establish_connection();
+fn delete_meme_test(conn: &PgConnection) {
+    use schema::memes::dsl::*;
     let mut input = String::new();
-    loop {
-        println!("Insert name of to delete, \\end to end");
-        std::io::stdin().read_line(&mut input).unwrap();
+        println!("Insert id of meme to delete");
+    std::io::stdin().read_line(&mut input).unwrap();
 
-        if input.trim_end() == "\\end" {
-            break;
-        }
+    let id = input.trim_end().parse::<i32>().expect("Invalid id");
 
-        diesel::delete(users.filter(username.like(&input.trim_end())))
-            .execute(&conn)
-            .expect(&format!("Error while deleting user {}", &input));
-        
-        input.truncate(0);
-    }
+    diesel::delete(memes.filter(memeid.eq(id)))
+        .execute(conn)
+        .expect(&format!("Error while deleting user {}", &input));
 }
