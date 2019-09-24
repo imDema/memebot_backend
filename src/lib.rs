@@ -1,10 +1,12 @@
 #[macro_use]
 extern crate diesel;
 extern crate dotenv;
+extern crate chrono;
 
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
+use chrono::prelude::*;
 use std::env;
 use self::models::{NewUser,User,NewMeme, Meme};
 
@@ -45,18 +47,26 @@ pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
     println!("Created user: {:?}", mm);
 }
 
-pub fn like_meme(conn: &PgConnection, memeid: i32) {
-    use schema::{users, memes};
-    let meme: Meme = diesel::update(memes::table.filter(memes::dsl::memeid.eq(memeid)))
-        .set(memes::dsl::upvote.eq(memes::dsl::upvote + 1))
+pub fn like_meme(conn: &PgConnection, userid: i32, memeid: i32) {
+    use schema::{users, memes,likes};
+    println!("{}",diesel::debug_query::<diesel::pg::Pg,_>(&diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::upvote.eq(memes::upvote + 1))));
+
+
+    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::upvote.eq(memes::upvote + 1))
         .get_result(conn)
         .expect("Error increasing meme upvotes");
 
-    diesel::update(users::table.filter(users::dsl::userid.eq(meme.author)))
-        .set(users::dsl::userupvote.eq(users::dsl::userupvote + 1))
+    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+        .set(users::userupvote.eq(users::userupvote + 1))
         .execute(conn)
         .expect(&format!("Error increasing user upvotes for meme {:?}", meme));
 
+    diesel::insert_into(likes::table)
+        .values((likes::memeid.eq(memeid), likes::userid.eq(userid), likes::liked_at.eq(Local::now().naive_local())))
+        .execute(conn)
+        .expect("Error tracking like data");
 }
 
 pub fn user_increase_upvote(conn: &PgConnection, id: i32) {

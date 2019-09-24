@@ -8,7 +8,7 @@ fn test_switcher() {
     let conn = establish_connection();
     loop {
         println!("
-newuser: new meme\tnewmeme: new meme
+newuser: new user\tnewmeme: new meme
 print: print all\tupv: upvote meme
 delmeme: delete meme
 \\end to end\n");
@@ -52,7 +52,7 @@ fn create_meme_test(conn: &PgConnection) {
 }
 
 fn load_test(conn: &PgConnection) {
-    use memebot_backend::schema::{users,memes};
+    use memebot_backend::schema::{users,memes,likes};
 
     let results = users::table
         .load::<User>(conn)
@@ -69,20 +69,36 @@ fn load_test(conn: &PgConnection) {
             println!("\t{:?}", meme);
         }
     }
+
+    let results = likes::table
+        .load::<Like>(conn)
+        .expect("Error loading likes");
+
+    for like in results {
+        println!("{:?}", like);
+    }
 }
 
 fn add_upv_test(conn: &PgConnection) {
     let mut input = String::new();
     loop {
-        println!("Insert id of meme to upvote, \\end to end");
+        println!("Insert id of user and meme liked (`USERID MEMEID`), \\end to end");
         std::io::stdin().read_line(&mut input).unwrap();
-
         if input.trim_end() == "\\end" {
             break;
         }
-        let id = input.trim_end().parse::<i32>().expect("Invalid id");
 
-        like_meme(conn, id);
+        let mut initer = input.trim().split(' ');
+
+        let userid = initer.next()
+            .unwrap_or_default()
+            .parse::<i32>().expect("Invalid userid");
+
+        let memeid = initer.next()
+            .unwrap_or_default()
+            .parse::<i32>().expect("Invalid memeid");
+
+        like_meme(conn, userid, memeid);
         input.truncate(0);
     }
 }

@@ -12,7 +12,25 @@ CREATE TABLE memes (
     image VARCHAR NOT NULL,
     --image_data BYTEA NOT NULL,
     upvote INTEGER NOT NULL,
-    downvote INTEGER NOT NULL
-    --date TIMESTAMP NOT NULL,
+    downvote INTEGER NOT NULL,
+    posted_at TIMESTAMP NOT NULL
     --heat FLOAT8
+);
+
+CREATE TABLE likes (
+    memeid INTEGER REFERENCES memes(memeid),
+    userid INTEGER REFERENCES users(userid),
+    liked_at TIMESTAMP NOT NULL,
+    PRIMARY KEY (memeid, userid)
+);
+
+CREATE TABLE tags (
+    tagid SERIAL PRIMARY KEY,
+    tagname VARCHAR NOT NULL
+);
+
+CREATE TABLE meme_tags (
+    tagid INTEGER NOT NULL REFERENCES tags(tagid),
+    memeid INTEGER NOT NULL REFERENCES memes(memeid),
+    PRIMARY KEY (tagid, memeid)
 );
