@@ -11,6 +11,7 @@ pub struct Meme {
     pub downvote: i32,
 }
 
+#[derive(Debug)]
 #[derive(Queryable)]
 pub struct User {
     pub userid: i32,
@@ -29,9 +30,20 @@ pub struct NewUser<'a> {
 
 #[derive(Insertable)]
 #[table_name="memes"]
-pub struct NewMeme<'a> {
+pub struct NewMeme {
     author: i32,
-    image: &'a str,
+    image: String,
     upvote: i32,
     downvote: i32,
+}
+
+impl NewMeme {
+    pub fn new((img, author): (&str, i32)) -> NewMeme {
+        NewMeme {
+            author,
+            image: img.to_owned(),
+            upvote: 0,
+            downvote: 0,
+        }
+    }
 }
