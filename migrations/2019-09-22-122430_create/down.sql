@@ -1,10 +1,10 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE meme_tags;
+DROP TABLE IF EXISTS meme_tags;
 
-DROP TABLE tags;
+DROP TABLE IF EXISTS tags;
 
-DROP TABLE likes;
+DROP TABLE IF EXISTS actions;
 
-DROP TABLE memes;
+DROP TABLE IF EXISTS memes;
 
-DROP TABLE users;
+DROP TABLE IF EXISTS users;

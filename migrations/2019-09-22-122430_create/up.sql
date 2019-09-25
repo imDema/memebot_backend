@@ -17,10 +17,11 @@ CREATE TABLE memes (
     --heat FLOAT8
 );
 
-CREATE TABLE likes (
+CREATE TABLE actions (
     memeid INTEGER REFERENCES memes(memeid),
     userid INTEGER REFERENCES users(userid),
-    liked_at TIMESTAMP NOT NULL,
+    is_upvote BOOLEAN NOT NULL,
+    posted_at TIMESTAMP NOT NULL,
     PRIMARY KEY (memeid, userid)
 );
 

@@ -3,12 +3,13 @@ extern crate diesel;
 extern crate dotenv;
 extern crate chrono;
 
+use std::error::Error;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use chrono::prelude::*;
 use std::env;
-use self::models::{NewUser,User,NewMeme, Meme};
+use self::models::*;
 
 pub mod schema;
 pub mod models;
@@ -47,34 +48,66 @@ pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
     println!("Created user: {:?}", mm);
 }
 
-pub fn like_meme(conn: &PgConnection, userid: i32, memeid: i32) {
-    use schema::{users, memes,likes};
-    println!("{}",diesel::debug_query::<diesel::pg::Pg,_>(&diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::upvote.eq(memes::upvote + 1))));
-
-
+fn increase_upvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
+    use schema::{memes, users};
     let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
         .set(memes::upvote.eq(memes::upvote + 1))
-        .get_result(conn)
-        .expect("Error increasing meme upvotes");
+        .get_result(conn)?;
 
     diesel::update(users::table.filter(users::userid.eq(meme.author)))
         .set(users::userupvote.eq(users::userupvote + 1))
-        .execute(conn)
-        .expect(&format!("Error increasing user upvotes for meme {:?}", meme));
+        .execute(conn)?;
+    Ok(())
+}
+fn decrease_upvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
+    use schema::{memes, users};
+    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::upvote.eq(memes::upvote - 1))
+        .get_result(conn)?;
 
-    diesel::insert_into(likes::table)
-        .values((likes::memeid.eq(memeid), likes::userid.eq(userid), likes::liked_at.eq(Local::now().naive_local())))
-        .execute(conn)
-        .expect("Error tracking like data");
+    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+        .set(users::userupvote.eq(users::userupvote - 1))
+        .execute(conn)?;
+        Ok(())
 }
 
-pub fn user_increase_upvote(conn: &PgConnection, id: i32) {
-    use schema::users::dsl::{users, userupvote};
-    diesel::update(users.find(id))
-        .set(userupvote.eq(userupvote + 1))
+fn increase_downvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
+    use schema::{memes, users};
+    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::downvote.eq(memes::downvote + 1))
+        .get_result(conn)?;
+
+    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+        .set(users::userdownvote.eq(users::userdownvote + 1))
+        .execute(conn)?;
+    Ok(())
+}
+fn decrease_downvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
+    use schema::{memes, users};
+    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::downvote.eq(memes::downvote - 1))
+        .get_result(conn)?;
+
+    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+        .set(users::userdownvote.eq(users::userdownvote - 1))
+        .execute(conn)?;
+        Ok(())
+}
+
+pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: ActionKind) {
+    use schema::{actions};
+
+    let action_key = (memeid, userid);
+
+    match action {
+        ActionKind::Upvote => increase_upvote_counters(conn, action_key),
+        ActionKind::Downvote => increase_downvote_counters(conn, action_key),
+    }.expect("Error updating vote count: {}");
+
+    diesel::insert_into(actions::table)
+        .values(Action::new((memeid, userid), action))
         .execute(conn)
-        .expect(&format!("Can't find user {}", id));
+        .expect("Error tracking like data");
 }
 
 #[cfg(test)]

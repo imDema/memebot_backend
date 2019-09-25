@@ -2,6 +2,7 @@ use chrono::prelude::*;
 
 use super::schema::users;
 use super::schema::memes;
+use super::schema::actions;
 
 #[derive(Debug)]
 #[derive(Queryable)]
@@ -23,12 +24,48 @@ pub struct User {
     pub userdownvote: i32,
 }
 
+pub enum ActionKind {
+    Upvote,
+    Downvote,
+}
+
 #[derive(Debug)]
 #[derive(Queryable)]
-pub struct Like {
-    pub userid: i32,
-    pub memeid: i32,
-    pub liked_at: NaiveDateTime,
+#[derive(Insertable)]
+pub struct Action {
+    memeid: i32,
+    userid: i32,
+    is_upvote: bool,
+    posted_at: NaiveDateTime,
+}
+
+impl Action {
+    pub fn new((memeid, userid) : (i32, i32), action: ActionKind) -> Action {
+        Action {
+            memeid,
+            userid,
+            is_upvote: match action {
+                ActionKind::Upvote => true,
+                ActionKind::Downvote => false,
+            },
+            posted_at: Local::now().naive_local(),
+        }
+    }
+    ///Returns (memeid, userid) tuple for this action
+    pub fn getKey(&self) -> (i32,i32) {
+        (self.memeid, self.userid)
+    }
+    //Get timestamp of when the action was exexuted
+    pub fn getTimestamp(&self) -> NaiveDateTime {
+        self.posted_at
+    }
+    ///Get the type of action
+    pub fn getActionKind(&self) -> ActionKind {
+        match self.is_upvote {
+            true => ActionKind::Upvote,
+            false => ActionKind::Downvote,
+        }
+    }
 }
 
 #[derive(Insertable)]
