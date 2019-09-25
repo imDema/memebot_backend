@@ -1,0 +1,51 @@
+newuser
+papaya
+newuser
+mango
+newuser
+avocado
+newuser
+mandarancio
+newuser
+kiwi
+newuser
+ananas
+newmeme
+butterfly.jpg 3
+newmeme
+caterpillar.jpg 3
+newmeme
+fly.jpg 4
+newmeme
+moth.jpg 1
+newmeme
+centipede.jpg 5
+newmeme
+spider.jpg 3
+newmeme
+bumblebee.jpg 4
+newmeme
+wasp.jpg 5
+upv
+5 3
+2 4
+2 3
+7 2
+1 1
+1 2
+\end
+dwv
+3 4
+4 4
+1 3
+6 3
+\end
+upv
+1 5
+5 5
+\end
+dwv
+5 2
+4 1
+\end
+print

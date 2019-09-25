@@ -92,11 +92,11 @@ fn add_upv_test(conn: &PgConnection) {
 
         let mut initer = input.trim().split(' ');
 
-        let userid = initer.next()
+        let memeid = initer.next()
             .unwrap_or_default()
             .parse::<i32>().expect("Invalid memeid");
 
-        let memeid = initer.next()
+        let userid = initer.next()
             .unwrap_or_default()
             .parse::<i32>().expect("Invalid userid");
 
@@ -116,11 +116,11 @@ fn add_dwv_test(conn: &PgConnection) {
 
         let mut initer = input.trim().split(' ');
 
-        let userid = initer.next()
+        let memeid = initer.next()
             .unwrap_or_default()
             .parse::<i32>().expect("Invalid memeid");
 
-        let memeid = initer.next()
+        let userid = initer.next()
             .unwrap_or_default()
             .parse::<i32>().expect("Invalid userid");
 
