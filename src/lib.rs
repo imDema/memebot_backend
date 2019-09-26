@@ -13,6 +13,7 @@ use self::models::*;
 
 pub mod schema;
 pub mod models;
+pub mod rating;
 
 ///Read database url from .env and connect to it
 pub fn establish_connection() -> PgConnection {
@@ -28,11 +29,8 @@ pub fn establish_connection() -> PgConnection {
 pub fn create_user(conn: &PgConnection, username: &str) -> User {
     use schema::users;
 
-    let new_user = NewUser {
-        username: username,
-        userupvote: 0,
-        userdownvote: 0,
-    };
+    let new_user = NewUser::new(username);
+    
     diesel::insert_into(users::table)
         .values(&new_user)
         .get_result(conn)

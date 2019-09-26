@@ -3,7 +3,8 @@ CREATE TABLE users (
     userid SERIAL PRIMARY KEY,
     username VARCHAR NOT NULL,
     userupvote INTEGER NOT NULL,
-    userdownvote INTEGER NOT NULL
+    userdownvote INTEGER NOT NULL,
+    userscore FLOAT4 NOT NULL
 );
 
 CREATE TABLE memes (
@@ -13,6 +14,7 @@ CREATE TABLE memes (
     --image_data BYTEA NOT NULL,
     upvote INTEGER NOT NULL,
     downvote INTEGER NOT NULL,
+    score FLOAT4 NOT NULL,
     posted_at TIMESTAMP NOT NULL
     --heat FLOAT8
 );

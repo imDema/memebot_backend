@@ -3,6 +3,7 @@ use chrono::prelude::*;
 use super::schema::users;
 use super::schema::memes;
 use super::schema::actions;
+use super::rating;
 
 #[derive(Debug)]
 #[derive(Queryable)]
@@ -12,6 +13,7 @@ pub struct Meme {
     pub image: String,
     pub upvote: i32,
     pub downvote: i32,
+    pub score: f32,
     pub posted_at: NaiveDateTime,
 }
 
@@ -22,6 +24,7 @@ pub struct User {
     pub username: String,
     pub userupvote: i32,
     pub userdownvote: i32,
+    pub userscore: f32,
 }
 
 pub enum ActionKind {
@@ -52,15 +55,15 @@ impl Action {
         }
     }
     ///Returns (memeid, userid) tuple for this action
-    pub fn getKey(&self) -> (i32,i32) {
+    pub fn get_key(&self) -> (i32,i32) {
         (self.memeid, self.userid)
     }
     //Get timestamp of when the action was exexuted
-    pub fn getTimestamp(&self) -> NaiveDateTime {
+    pub fn get_timestamp(&self) -> NaiveDateTime {
         self.posted_at
     }
     ///Get the type of action
-    pub fn getActionKind(&self) -> ActionKind {
+    pub fn get_action_kind(&self) -> ActionKind {
         match self.is_upvote {
             true => ActionKind::Upvote,
             false => ActionKind::Downvote,
@@ -70,10 +73,22 @@ impl Action {
 
 #[derive(Insertable)]
 #[table_name="users"]
-pub struct NewUser<'a> {
-    pub username: &'a str,
-    pub userupvote: i32,
-    pub userdownvote: i32,
+pub struct NewUser {
+    username: String,
+    userupvote: i32,
+    userdownvote: i32,
+    userscore: f32,
+}
+
+impl NewUser {
+    pub fn new(username: &str) -> NewUser {
+        NewUser {
+            username: username.to_owned(),
+            userupvote: 0,
+            userdownvote: 0,
+            userscore: rating::score(0, 0),
+        }
+    }
 }
 
 #[derive(Insertable)]
@@ -83,6 +98,7 @@ pub struct NewMeme {
     image: String,
     upvote: i32,
     downvote: i32,
+    score: f32,
     posted_at: NaiveDateTime,
 }
 
@@ -93,6 +109,7 @@ impl NewMeme {
             image: img.to_owned(),
             upvote: 0,
             downvote: 0,
+            score: rating::score(0, 0),
             posted_at: Local::now().naive_local(),
         }
     }

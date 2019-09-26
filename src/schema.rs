@@ -14,6 +14,7 @@ table! {
         image -> Varchar,
         upvote -> Int4,
         downvote -> Int4,
+        score -> Float4,
         posted_at -> Timestamp,
     }
 }
@@ -38,6 +39,7 @@ table! {
         username -> Varchar,
         userupvote -> Int4,
         userdownvote -> Int4,
+        userscore -> Float4,
     }
 }
 
