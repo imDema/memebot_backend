@@ -46,66 +46,107 @@ pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
     println!("Created user: {:?}", mm);
 }
 
-fn increase_upvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
-    use schema::{memes, users};
-    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::upvote.eq(memes::upvote + 1))
-        .get_result(conn)?;
+fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
+    use schema::actions::dsl::*;
+    let change = match &action {
+        ActionKind::Upvote => (1, 0),
+        ActionKind::Downvote => (0, 1),
+    };
 
-    diesel::update(users::table.filter(users::userid.eq(meme.author)))
-        .set(users::userupvote.eq(users::userupvote + 1))
-        .execute(conn)?;
-    Ok(())
-}
-fn decrease_upvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
-    use schema::{memes, users};
-    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::upvote.eq(memes::upvote - 1))
-        .get_result(conn)?;
-
-    diesel::update(users::table.filter(users::userid.eq(meme.author)))
-        .set(users::userupvote.eq(users::userupvote - 1))
-        .execute(conn)?;
-        Ok(())
+    diesel::insert_into(actions)
+        .values(Action::new(action_key, action))
+        .execute(conn)
+        .expect("Error creating new action!");
+    
+    change
 }
 
-fn increase_downvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
-    use schema::{memes, users};
-    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::downvote.eq(memes::downvote + 1))
-        .get_result(conn)?;
-
-    diesel::update(users::table.filter(users::userid.eq(meme.author)))
-        .set(users::userdownvote.eq(users::userdownvote + 1))
-        .execute(conn)?;
-    Ok(())
-}
-fn decrease_downvote_counters(conn: &PgConnection, (memeid, userid) : (i32, i32)) -> Result<(), Box<dyn Error>> {
-    use schema::{memes, users};
-    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::downvote.eq(memes::downvote - 1))
-        .get_result(conn)?;
-
-    diesel::update(users::table.filter(users::userid.eq(meme.author)))
-        .set(users::userdownvote.eq(users::userdownvote - 1))
-        .execute(conn)?;
-        Ok(())
+fn cancel_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
+    use schema::actions::dsl::*;
+    diesel::delete(actions)
+        .filter(memeid.eq(action_key.0))
+        .filter(userid.eq(action_key.1))
+        .execute(conn)
+        .expect("Error trying to delete action!");
+    
+    match action {
+        ActionKind::Upvote => (-1, 0),
+        ActionKind::Downvote => (0, -1),
+    }
 }
 
+fn update_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
+    use schema::actions::dsl::*;
+
+    diesel::update(actions)
+        .filter(memeid.eq(action_key.0))
+        .filter(userid.eq(action_key.1))
+        .set((
+            is_upvote.eq(match &action {
+                ActionKind::Upvote => true,
+                ActionKind::Downvote => false,
+            }),
+            posted_at.eq(Local::now().naive_local())
+        ))
+        .execute(conn)
+        .expect("Error trying to delete action!");
+    
+    match action {
+        ActionKind::Upvote => (1, -1),
+        ActionKind::Downvote => (-1, 1),
+    }
+}
+
+fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
+    use schema::actions::dsl::*;
+    let existing_action = actions
+        .filter(memeid.eq(action_key.0))
+        .filter(userid.eq(action_key.1))
+        .load::<Action>(conn)
+        .expect(&format!("Error retrieving existing actions for (memeid, userid): ({}, {})", action_key.0, action_key.1));
+
+    match existing_action.len() {
+        0 => create_action(conn, action_key, action),
+        1 => {
+            if existing_action[0].get_action_kind() == action {
+                cancel_action(conn, action_key, action)
+            } else {
+                update_action(conn, action_key, action)
+            }
+        },
+        _ => panic!(format!("Found multiple actions for (memeid, userid): ({}, {})!", action_key.0, action_key.1))
+    }
+}
+
+/// Handle upvote or downvote event
+/// upvoting an already upvoted post will cancel the vote (same for downvotes)
+/// upvoting a downvoted post will cancel the downvote and add an upvote (same reversed)
+/// 
+/// # Arguments
+/// * `memeid` id of the meme upvoted or downvoted
+/// * `userid` id of the user which did the action
 pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: ActionKind) {
-    use schema::{actions};
+    use schema::{memes, users};
 
     let action_key = (memeid, userid);
 
-    match action {
-        ActionKind::Upvote => increase_upvote_counters(conn, action_key),
-        ActionKind::Downvote => increase_downvote_counters(conn, action_key),
-    }.expect("Error updating vote count: {}");
+    let (upchange, downchange) = apply_action(conn, action_key, action);
 
-    diesel::insert_into(actions::table)
-        .values(Action::new((memeid, userid), action))
+    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set((
+            memes::upvote.eq(memes::upvote + upchange),
+            memes::downvote.eq(memes::downvote + downchange),
+            ))
+        .get_result(conn)
+        .expect("Error updating meme vote counters");
+
+    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+        .set((
+            users::userupvote.eq(users::userupvote + upchange),
+            users::userdownvote.eq(users::userdownvote + downchange),
+            ))
         .execute(conn)
-        .expect("Error tracking like data");
+        .expect("Error updating user vote counters");
 }
 
 #[cfg(test)]

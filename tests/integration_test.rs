@@ -1,7 +1,6 @@
 use memebot_backend::*;
 use memebot_backend::models::*;
 use diesel::prelude::*;
-use self::models::*;
 
 #[test]
 fn test_switcher() {

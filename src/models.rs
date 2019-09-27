@@ -27,6 +27,7 @@ pub struct User {
     pub userscore: f32,
 }
 
+#[derive(PartialEq)]
 pub enum ActionKind {
     Upvote,
     Downvote,
