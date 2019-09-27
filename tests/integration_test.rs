@@ -56,6 +56,7 @@ fn load_test(conn: &PgConnection) {
     use memebot_backend::schema::{users,memes,actions};
 
     let results = users::table
+        .order(users::userscore.desc())
         .load::<User>(conn)
         .expect("Error loading users!");
 
@@ -63,6 +64,7 @@ fn load_test(conn: &PgConnection) {
         println!("{:?}", user);
         let memeresults = memes::table
             .filter(memes::author.eq(user.userid))
+            .order(memes::score.desc())
             .load::<Meme>(conn)
             .expect("Error loading memes!");
 

@@ -140,13 +140,24 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
         .get_result(conn)
         .expect("Error updating meme vote counters");
 
-    diesel::update(users::table.filter(users::userid.eq(meme.author)))
+    let user: User = diesel::update(users::table.filter(users::userid.eq(meme.author)))
         .set((
             users::userupvote.eq(users::userupvote + upchange),
             users::userdownvote.eq(users::userdownvote + downchange),
             ))
-        .execute(conn)
+        .get_result(conn)
         .expect("Error updating user vote counters");
+
+    //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
+    diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+        .set(memes::score.eq(rating::score(meme.upvote, meme.downvote)))
+        .execute(conn)
+        .expect("Error updating meme score");
+    diesel::update(users::table.filter(users::userid.eq(userid)))
+        .set(users::userscore.eq(rating::score(user.userupvote, user.userdownvote)))
+        .execute(conn)
+        .expect("Error updating meme score");
+    //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER    
 }
 
 #[cfg(test)]
