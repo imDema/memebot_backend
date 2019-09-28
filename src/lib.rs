@@ -3,13 +3,12 @@ extern crate diesel;
 extern crate dotenv;
 extern crate chrono;
 
-use std::error::Error;
 use diesel::prelude::*;
 use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use chrono::prelude::*;
 use std::env;
-use self::models::*;
+use models::*;
 
 pub mod schema;
 pub mod models;
@@ -26,24 +25,25 @@ pub fn establish_connection() -> PgConnection {
         .expect(&format!("Error connecting to database {}", db_url))
 }
 
-pub fn create_user(conn: &PgConnection, username: &str) -> User {
+/// Create a new user in database
+pub fn create_user(conn: &PgConnection, username: &str) {
     use schema::users;
 
     let new_user = NewUser::new(username);
     
     diesel::insert_into(users::table)
         .values(&new_user)
-        .get_result(conn)
-        .expect("Error creating user!")
+        .execute(conn)
+        .expect("Error creating user!");
 }
 
+/// Create a new meme
 pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
     use schema::memes;
-    let mm : Meme = diesel::insert_into(memes::table)
+    diesel::insert_into(memes::table)
         .values(&meme)
-        .get_result(conn)
+        .execute(conn)
         .expect("Error creating meme!");
-    println!("Created user: {:?}", mm);
 }
 
 fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
@@ -140,7 +140,7 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
         .get_result(conn)
         .expect("Error updating meme vote counters");
 
-    let user: User = diesel::update(users::table.filter(users::userid.eq(meme.author)))
+    let user: User = diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
         .set((
             users::userupvote.eq(users::userupvote + upchange),
             users::userdownvote.eq(users::userdownvote + downchange),
@@ -149,17 +149,58 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
         .expect("Error updating user vote counters");
 
     //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
+    let new_meme_score = rating::score(meme.upvote, meme.downvote);
+    let new_user_score = rating::score(user.userupvote, user.userdownvote);
+
+    eprintln!("{:?}\nnewscore: {}\n{:?}\nnewscore: {}\n", meme, new_meme_score, user, new_user_score);
+
     diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::score.eq(rating::score(meme.upvote, meme.downvote)))
+        .set(memes::score.eq(new_meme_score))
         .execute(conn)
         .expect("Error updating meme score");
-    diesel::update(users::table.filter(users::userid.eq(userid)))
-        .set(users::userscore.eq(rating::score(user.userupvote, user.userdownvote)))
+    diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
+        .set(users::userscore.eq(new_user_score))
         .execute(conn)
         .expect("Error updating meme score");
     //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER    
 }
 
+pub fn create_tag(conn: &PgConnection, tagname: &str) {
+    use schema::tags;
+
+    let saved_tag = tags::table
+        .filter(tags::tagname.like(tagname))
+        .select(tags::tagid)
+        .get_result::<i32>(conn)
+        .optional()
+        .expect("Error checking tag existence");
+    
+    match saved_tag {
+        None => {
+            diesel::insert_into(tags::table)
+                .values(tags::tagname.eq(tagname))
+                .execute(conn)
+                .expect("Error creating tag");()
+            },
+        Some(id) => eprintln!("Tag already exists with id {}!", id),
+    };        
+}
+
+pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) {
+    use schema::meme_tags;
+    diesel::insert_into(meme_tags::table)
+        .values((meme_tags::tagid.eq(tagid), meme_tags::memeid.eq(memeid)))
+        .execute(conn)
+        .expect("Error adding tag to meme");
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    #[test]
+    fn test_create_tag() {
+        let mut s = String::new();
+        std::io::stdin().read_line(&mut s).unwrap();
+        create_tag(&establish_connection(), &s[..s.len()-1]);
+    }
 }

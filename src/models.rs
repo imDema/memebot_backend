@@ -9,7 +9,7 @@ use super::rating;
 #[derive(Queryable)]
 pub struct Meme {
     pub memeid: i32,
-    pub author: i32,
+    pub authorid: i32,
     pub image: String,
     pub upvote: i32,
     pub downvote: i32,
@@ -27,12 +27,6 @@ pub struct User {
     pub userscore: f32,
 }
 
-#[derive(PartialEq)]
-pub enum ActionKind {
-    Upvote,
-    Downvote,
-}
-
 #[derive(Debug)]
 #[derive(Queryable)]
 #[derive(Insertable)]
@@ -41,6 +35,12 @@ pub struct Action {
     userid: i32,
     is_upvote: bool,
     posted_at: NaiveDateTime,
+}
+
+#[derive(PartialEq)]
+pub enum ActionKind {
+    Upvote,
+    Downvote,
 }
 
 impl Action {
@@ -104,7 +104,7 @@ pub struct NewMeme {
 }
 
 impl NewMeme {
-    pub fn new((img, author): (&str, i32)) -> NewMeme {
+    pub fn new(img: &str, author: i32) -> NewMeme {
         NewMeme {
             author,
             image: img.to_owned(),
