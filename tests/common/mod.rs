@@ -67,8 +67,6 @@ pub fn print_meta_test(conn: &PgConnection) {
     for action in results {
         println!("{:?}", action);
     }
-    
-    println!("");
 
     let results = tags::table
         .select((tags::tagid, tags::tagname))
@@ -77,6 +75,14 @@ pub fn print_meta_test(conn: &PgConnection) {
 
     for tag in results {
         println!("Tag {:?}", tag);
+    }
+
+    let res = meme_tags::table
+        .load::<MemeTag>(conn)
+        .expect("Error loading MemeTags");
+
+    for meme_tag in res {
+        println!("{:?}", meme_tag);
     }
 }
 
@@ -111,6 +117,34 @@ pub fn downvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &
 
     match (memeid, userid) {
         (Ok(meid), Ok(usid)) => Ok(meme_action(conn, meid, usid, ActionKind::Downvote)),
+        (Err(_), _) => Err("Error parsing memeid\n"),
+        (_, Err(_)) => Err("Error parsing userid\n"),
+    }
+}
+
+
+pub fn create_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>) -> Result<(), &'static str> {
+    let tag = match words.next() {
+        Some(w) => w,
+        None => return Err("Not enough arguments\n"),
+    };
+
+    Ok(create_tag(conn, tag))
+}
+
+pub fn add_meme_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>) -> Result<(), &'static str> {
+    let memeid = match words.next() {
+        Some(w) => w,
+        None => return Err("Not enough arguments\n"),
+    }.parse::<i32>();
+
+    let tagid = match words.next() {
+        Some(w) => w,
+        None => return Err("Not enough arguments\n"),
+    }.parse::<i32>();
+
+    match (memeid, tagid) {
+        (Ok(meid), Ok(tgid)) => Ok(add_meme_tag(conn, meid, tgid)),
         (Err(_), _) => Err("Error parsing memeid\n"),
         (_, Err(_)) => Err("Error parsing userid\n"),
     }

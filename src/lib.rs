@@ -9,6 +9,7 @@ use dotenv::dotenv;
 use chrono::prelude::*;
 use std::env;
 use models::*;
+use schema::*;
 
 pub mod schema;
 pub mod models;
@@ -27,8 +28,6 @@ pub fn establish_connection() -> PgConnection {
 
 /// Create a new user in database
 pub fn create_user(conn: &PgConnection, username: &str) {
-    use schema::users;
-
     let new_user = NewUser::new(username);
     
     diesel::insert_into(users::table)
@@ -39,7 +38,6 @@ pub fn create_user(conn: &PgConnection, username: &str) {
 
 /// Create a new meme
 pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
-    use schema::memes;
     diesel::insert_into(memes::table)
         .values(&meme)
         .execute(conn)
@@ -126,8 +124,6 @@ fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind)
 /// * `memeid` id of the meme upvoted or downvoted
 /// * `userid` id of the user which did the action
 pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: ActionKind) {
-    use schema::{memes, users};
-
     let action_key = (memeid, userid);
 
     let (upchange, downchange) = apply_action(conn, action_key, action);
@@ -166,8 +162,6 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
 }
 
 pub fn create_tag(conn: &PgConnection, tagname: &str) {
-    use schema::tags;
-
     let saved_tag = tags::table
         .filter(tags::tagname.like(tagname))
         .select(tags::tagid)
@@ -187,11 +181,14 @@ pub fn create_tag(conn: &PgConnection, tagname: &str) {
 }
 
 pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) {
-    use schema::meme_tags;
     diesel::insert_into(meme_tags::table)
-        .values((meme_tags::tagid.eq(tagid), meme_tags::memeid.eq(memeid)))
+        .values(MemeTag::new(memeid, tagid))
         .execute(conn)
         .expect("Error adding tag to meme");
+}
+
+pub fn memes_by_tag(tagid: i32) {
+    
 }
 
 #[cfg(test)]

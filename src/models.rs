@@ -1,8 +1,6 @@
 use chrono::prelude::*;
 
-use super::schema::users;
-use super::schema::memes;
-use super::schema::actions;
+use super::schema::*;
 use super::rating;
 
 #[derive(Debug)]
@@ -37,6 +35,15 @@ pub struct Action {
     posted_at: NaiveDateTime,
 }
 
+#[derive(Debug)]
+#[derive(Queryable)]
+#[derive(Insertable)]
+#[table_name="meme_tags"]
+pub struct MemeTag {
+    memeid: i32,
+    tagid: i32,
+}
+
 #[derive(PartialEq)]
 pub enum ActionKind {
     Upvote,
@@ -69,6 +76,12 @@ impl Action {
             true => ActionKind::Upvote,
             false => ActionKind::Downvote,
         }
+    }
+}
+
+impl MemeTag {
+    pub fn new(memeid: i32, tagid: i32) -> MemeTag {
+        MemeTag {memeid, tagid}
     }
 }
 

@@ -29,6 +29,7 @@ fn test_switcher() {
         let command_result = match words.next() {
             Some("adduser") => create_user_test(&conn, words),
             Some("addmeme") => create_meme_test(&conn, words),
+            Some("addtag") => create_tag_test(&conn, words),
             Some("upvote") => upvote_test(&conn, words),
             Some("downvote") => downvote_test(&conn, words),
             Some("delmeme") => delete_meme_test(&conn, words),
