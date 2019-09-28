@@ -5,9 +5,10 @@ pub mod common;
 
 const HELPMESSAGE: &str = "COMMANDS:
 adduser USERNAME\t\taddmeme IMAGE AUTHORID
+addtag TAGNAME\taddmemetag MEMEID TAGID
 upvote MEMEID FROMUSERID\tdownvote MEMEID FROMUSERID
 delmeme MEMEID
-print\tprintmeta\tprintuser
+print\tprintmeta\tprinttags\tprintuser
 help";
 
 #[test]
@@ -30,11 +31,13 @@ fn test_switcher() {
             Some("adduser") => create_user_test(&conn, words),
             Some("addmeme") => create_meme_test(&conn, words),
             Some("addtag") => create_tag_test(&conn, words),
+            Some("addmemetag") => add_meme_tag_test(&conn, words),
             Some("upvote") => upvote_test(&conn, words),
             Some("downvote") => downvote_test(&conn, words),
             Some("delmeme") => delete_meme_test(&conn, words),
             Some("print") => Ok(print_test(&conn)),
             Some("printuser") => Ok(print_users_test(&conn)),
+            Some("printtags") => Ok(print_tag_test(&conn)),
             Some("printmeta") => Ok(print_meta_test(&conn)),
             Some("help") => Ok(println!("{}", HELPMESSAGE)),
             Some("exit") => break,

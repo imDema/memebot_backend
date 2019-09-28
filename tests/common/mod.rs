@@ -48,6 +48,22 @@ pub fn print_test(conn: &PgConnection) {
     }
 }
 
+pub fn print_tag_test(conn: &PgConnection) {
+    let tgs = tags::table
+        .select((tags::tagid, tags::tagname))
+        .get_results::<(i32, String)>(conn)
+        .expect("Error retrieving tags");
+
+    for t in tgs {
+        println!("{:?}", &t);
+
+        let mms = memes_by_tag_score_ordered(conn, t.0);
+        for meme in mms.iter() {
+            println!("{:?}", meme);
+        }
+    }
+}
+
 pub fn print_users_test(conn: &PgConnection) {
     let results = users::table
         .order(users::userscore.desc())

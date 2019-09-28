@@ -148,8 +148,6 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
     let new_meme_score = rating::score(meme.upvote, meme.downvote);
     let new_user_score = rating::score(user.userupvote, user.userdownvote);
 
-    eprintln!("{:?}\nnewscore: {}\n{:?}\nnewscore: {}\n", meme, new_meme_score, user, new_user_score);
-
     diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
         .set(memes::score.eq(new_meme_score))
         .execute(conn)
@@ -183,12 +181,47 @@ pub fn create_tag(conn: &PgConnection, tagname: &str) {
 pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) {
     diesel::insert_into(meme_tags::table)
         .values(MemeTag::new(memeid, tagid))
+        .on_conflict((meme_tags::memeid, meme_tags::tagid))
+        .do_nothing()
         .execute(conn)
         .expect("Error adding tag to meme");
 }
 
-pub fn memes_by_tag(tagid: i32) {
-    
+/// Returns all memes with tag `tagid`
+pub fn memes_by_tag(conn: &PgConnection, tagid: i32) -> Vec<Meme> {
+    memes::dsl::memes
+        .inner_join(meme_tags::dsl::meme_tags
+            .inner_join(tags::dsl::tags))
+        .filter(tags::tagid.eq(tagid))
+        .select((
+            memes::memeid,
+            memes::author,
+            memes::image,
+            memes::upvote,
+            memes::downvote,
+            memes::score,
+            memes::posted_at,))
+        .load::<Meme>(conn)
+        .expect("Error retrieving memes by tag")
+}
+
+/// Returns all memes with tag `tagid` ordered by score
+pub fn memes_by_tag_score_ordered(conn: &PgConnection, tagid: i32) -> Vec<Meme> {
+    memes::dsl::memes
+        .inner_join(meme_tags::dsl::meme_tags
+            .inner_join(tags::dsl::tags))
+        .filter(tags::tagid.eq(tagid))
+        .select((
+            memes::memeid,
+            memes::author,
+            memes::image,
+            memes::upvote,
+            memes::downvote,
+            memes::score,
+            memes::posted_at,))
+        .order_by(memes::score.desc())
+        .load::<Meme>(conn)
+        .expect("Error retrieving memes by tag")
 }
 
 #[cfg(test)]
