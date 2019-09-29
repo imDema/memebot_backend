@@ -26,7 +26,7 @@ pub fn establish_connection() -> PgConnection {
         .expect(&format!("Error connecting to database {}", db_url))
 }
 
-/// Create a new user in database
+/// Add a new user with username `username` to database
 pub fn create_user(conn: &PgConnection, username: &str) {
     let new_user = NewUser::new(username);
     
@@ -36,7 +36,7 @@ pub fn create_user(conn: &PgConnection, username: &str) {
         .expect("Error creating user!");
 }
 
-/// Create a new meme
+/// Add a new meme to database
 pub fn create_meme(conn: &PgConnection, meme: NewMeme) {
     diesel::insert_into(memes::table)
         .values(&meme)
@@ -55,43 +55,51 @@ fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind
         .values(Action::new(action_key, action))
         .execute(conn)
         .expect("Error creating new action!");
+
+    // TODO
+    // diesel::update(memes.table)
+    //     .filter(memes::memeid.eq(action_key.0))
+    //     .values(memes::heat)
     
     change
 }
 
-fn cancel_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
-    use schema::actions::dsl::*;
-    diesel::delete(actions)
-        .filter(memeid.eq(action_key.0))
-        .filter(userid.eq(action_key.1))
-        .execute(conn)
-        .expect("Error trying to delete action!");
-    
-    match action {
-        ActionKind::Upvote => (-1, 0),
-        ActionKind::Downvote => (0, -1),
-    }
-}
-
-fn update_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> (i32, i32) {
+fn update_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind, existing_action: Action) -> (i32, i32) {
     use schema::actions::dsl::*;
 
-    diesel::update(actions)
+    let select_query = diesel::update(actions)
         .filter(memeid.eq(action_key.0))
-        .filter(userid.eq(action_key.1))
-        .set((
-            is_upvote.eq(match &action {
-                ActionKind::Upvote => true,
-                ActionKind::Downvote => false,
-            }),
-            posted_at.eq(Local::now().naive_local())
-        ))
-        .execute(conn)
-        .expect("Error trying to delete action!");
-    
-    match action {
-        ActionKind::Upvote => (1, -1),
-        ActionKind::Downvote => (-1, 1),
+        .filter(userid.eq(action_key.1));
+
+    if existing_action.is_active() {
+        if existing_action.get_action_kind() == action {
+            select_query
+                .set(is_active.eq(false))
+                .execute(conn)
+                .expect("Error deactivating action");
+            match action {
+                ActionKind::Upvote => (-1, 0),
+                ActionKind::Downvote => (0, -1),
+            }
+        } else {
+            select_query
+                .set(is_upvote.eq(action.is_upvote()))
+                .execute(conn)
+                .expect("Error inverting action");
+            match action {
+                ActionKind::Upvote => (1, -1),
+                ActionKind::Downvote => (-1, 1),
+            }
+        }
+    } else {
+        select_query
+            .set((is_active.eq(true), is_upvote.eq(action.is_upvote())))
+            .execute(conn)
+            .expect("Error activating action");
+        match action {
+            ActionKind::Upvote => (1, 0),
+            ActionKind::Downvote => (0, 1),
+        }
     }
 }
 
@@ -105,13 +113,7 @@ fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind)
 
     match existing_action.len() {
         0 => create_action(conn, action_key, action),
-        1 => {
-            if existing_action[0].get_action_kind() == action {
-                cancel_action(conn, action_key, action)
-            } else {
-                update_action(conn, action_key, action)
-            }
-        },
+        1 => update_action(conn, action_key, action, existing_action[0]),
         _ => panic!(format!("Found multiple actions for (memeid, userid): ({}, {})!", action_key.0, action_key.1))
     }
 }
@@ -159,6 +161,7 @@ pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: Action
     //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER    
 }
 
+/// Add a new tag with name `tagname` to database
 pub fn create_tag(conn: &PgConnection, tagname: &str) {
     let saved_tag = tags::table
         .filter(tags::tagname.like(tagname))
@@ -178,6 +181,7 @@ pub fn create_tag(conn: &PgConnection, tagname: &str) {
     };        
 }
 
+/// Add tag `tagid` to meme `memeid`
 pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) {
     diesel::insert_into(meme_tags::table)
         .values(MemeTag::new(memeid, tagid))

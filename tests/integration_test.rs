@@ -4,11 +4,11 @@ use common::*;
 pub mod common;
 
 const HELPMESSAGE: &str = "COMMANDS:
-adduser USERNAME\t\taddmeme IMAGE AUTHORID
+adduser USERNAME\taddmeme IMAGE AUTHORID
 addtag TAGNAME\taddmemetag MEMEID TAGID
 upvote MEMEID FROMUSERID\tdownvote MEMEID FROMUSERID
-delmeme MEMEID
 print\tprintmeta\tprinttags\tprintuser
+delmeme MEMEID
 help";
 
 #[test]

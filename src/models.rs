@@ -32,6 +32,7 @@ pub struct Action {
     memeid: i32,
     userid: i32,
     is_upvote: bool,
+    is_active: bool,
     posted_at: NaiveDateTime,
 }
 
@@ -50,6 +51,15 @@ pub enum ActionKind {
     Downvote,
 }
 
+impl ActionKind {
+    pub fn is_upvote(&self) -> bool {
+        match self {
+            ActionKind::Upvote => true,
+            ActionKind::Downvote => false,
+        }
+    } 
+}
+
 impl Action {
     pub fn new((memeid, userid) : (i32, i32), action: ActionKind) -> Action {
         Action {
@@ -59,12 +69,16 @@ impl Action {
                 ActionKind::Upvote => true,
                 ActionKind::Downvote => false,
             },
+            is_active: true,
             posted_at: Local::now().naive_local(),
         }
     }
     ///Returns (memeid, userid) tuple for this action
     pub fn get_key(&self) -> (i32,i32) {
         (self.memeid, self.userid)
+    }
+    pub fn is_active(&self) -> bool {
+        self.is_active
     }
     //Get timestamp of when the action was exexuted
     pub fn get_timestamp(&self) -> NaiveDateTime {

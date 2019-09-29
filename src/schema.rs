@@ -3,6 +3,7 @@ table! {
         memeid -> Int4,
         userid -> Int4,
         is_upvote -> Bool,
+        is_active -> Bool,
         posted_at -> Timestamp,
     }
 }
@@ -22,6 +23,7 @@ table! {
         upvote -> Int4,
         downvote -> Int4,
         score -> Float4,
+        heat -> Float4,
         posted_at -> Timestamp,
     }
 }

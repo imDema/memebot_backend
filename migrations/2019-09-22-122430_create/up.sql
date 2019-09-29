@@ -15,14 +15,15 @@ CREATE TABLE memes (
     upvote INTEGER NOT NULL,
     downvote INTEGER NOT NULL,
     score FLOAT4 NOT NULL,
+    heat FLOAT4 NOT NULL,
     posted_at TIMESTAMP NOT NULL
-    --heat FLOAT8
 );
 
 CREATE TABLE actions (
     memeid INTEGER REFERENCES memes(memeid),
     userid INTEGER REFERENCES users(userid),
     is_upvote BOOLEAN NOT NULL,
+    is_active BOOLEAN NOT NULL,
     posted_at TIMESTAMP NOT NULL,
     PRIMARY KEY (memeid, userid)
 );
