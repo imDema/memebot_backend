@@ -56,15 +56,28 @@ fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind
         .execute(conn)
         .expect("Error creating new action!");
 
-    // TODO
-    // diesel::update(memes.table)
-    //     .filter(memes::memeid.eq(action_key.0))
-    //     .values(memes::heat)
+    // TODO SUBSTITUTE WITH SQL FUNCTIONS AND TRIGGERS
+    let (currheat, last_action) = memes::table
+        .filter(memes::memeid.eq(action_key.0))
+        .select((memes::heat, memes::last_action))
+        .get_result::<(f32, NaiveDateTime)>(conn)
+        .expect("Error retrieving heat");
+
+    let now = Local::now().naive_local();
+
+    diesel::update(memes::table)
+        .filter(memes::memeid.eq(action_key.0))
+        .set((memes::heat.eq(rating::heat_decay(currheat, last_action, now)),
+            memes::last_action.eq(now)))
+        .execute(conn)
+        .expect("Error updating heat");
+    
+    // TODO SUBSTITUTE WITH SQL FUNCTIONS AND TRIGGERS
     
     change
 }
 
-fn update_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind, existing_action: Action) -> (i32, i32) {
+fn update_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind, existing_action: &Action) -> (i32, i32) {
     use schema::actions::dsl::*;
 
     let select_query = diesel::update(actions)
@@ -113,7 +126,7 @@ fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind)
 
     match existing_action.len() {
         0 => create_action(conn, action_key, action),
-        1 => update_action(conn, action_key, action, existing_action[0]),
+        1 => update_action(conn, action_key, action, &existing_action[0]),
         _ => panic!(format!("Found multiple actions for (memeid, userid): ({}, {})!", action_key.0, action_key.1))
     }
 }
@@ -204,6 +217,8 @@ pub fn memes_by_tag(conn: &PgConnection, tagid: i32) -> Vec<Meme> {
             memes::upvote,
             memes::downvote,
             memes::score,
+            memes::heat,
+            memes::last_action,
             memes::posted_at,))
         .load::<Meme>(conn)
         .expect("Error retrieving memes by tag")
@@ -222,6 +237,8 @@ pub fn memes_by_tag_score_ordered(conn: &PgConnection, tagid: i32) -> Vec<Meme> 
             memes::upvote,
             memes::downvote,
             memes::score,
+            memes::heat,
+            memes::last_action,
             memes::posted_at,))
         .order_by(memes::score.desc())
         .load::<Meme>(conn)

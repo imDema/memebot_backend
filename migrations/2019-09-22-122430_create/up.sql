@@ -16,6 +16,7 @@ CREATE TABLE memes (
     downvote INTEGER NOT NULL,
     score FLOAT4 NOT NULL,
     heat FLOAT4 NOT NULL,
+    last_action TIMESTAMP NOT NULL,
     posted_at TIMESTAMP NOT NULL
 );
 

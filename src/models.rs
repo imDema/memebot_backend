@@ -12,6 +12,8 @@ pub struct Meme {
     pub upvote: i32,
     pub downvote: i32,
     pub score: f32,
+    pub heat: f32,
+    pub last_action: NaiveDateTime,
     pub posted_at: NaiveDateTime,
 }
 
@@ -127,6 +129,8 @@ pub struct NewMeme {
     upvote: i32,
     downvote: i32,
     score: f32,
+    heat: f32,
+    last_action: NaiveDateTime,
     posted_at: NaiveDateTime,
 }
 
@@ -138,6 +142,8 @@ impl NewMeme {
             upvote: 0,
             downvote: 0,
             score: rating::score(0, 0),
+            heat: 10.0,
+            last_action: Local::now().naive_local(),
             posted_at: Local::now().naive_local(),
         }
     }
