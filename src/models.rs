@@ -63,7 +63,7 @@ impl ActionKind {
 }
 
 impl Action {
-    pub fn new((memeid, userid) : (i32, i32), action: ActionKind) -> Action {
+    pub fn new((memeid, userid) : (i32, i32), action: &ActionKind) -> Action {
         Action {
             memeid,
             userid,

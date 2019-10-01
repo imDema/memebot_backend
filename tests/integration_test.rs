@@ -7,7 +7,7 @@ const HELPMESSAGE: &str = "COMMANDS:
 adduser USERNAME\taddmeme IMAGE AUTHORID
 addtag TAGNAME\taddmemetag MEMEID TAGID
 upvote MEMEID FROMUSERID\tdownvote MEMEID FROMUSERID
-print\tprintmeta\tprinttags\tprintuser
+print\tprintmeta\tprinttags\tprintuser\tprinthot
 delmeme MEMEID
 help";
 
@@ -39,6 +39,7 @@ fn test_switcher() {
             Some("printuser") => Ok(print_users_test(&conn)),
             Some("printtags") => Ok(print_tag_test(&conn)),
             Some("printmeta") => Ok(print_meta_test(&conn)),
+            Some("printhot") => Ok(print_hot(&conn)),
             Some("help") => Ok(println!("{}", HELPMESSAGE)),
             Some("exit") => break,
             _ => Err("Invalid command\n"),

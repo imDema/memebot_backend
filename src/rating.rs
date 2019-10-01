@@ -20,14 +20,14 @@ pub fn score(upvotes: i32, downvotes: i32) -> f32 {
     (r * nw / (nw + N) + R0 * N / (nw + N)) as f32
 }
 
-const HEAT_START: f32 = 10.0;
-const HEAT_POS_INCREASE: f32 = 1.0;
+pub const HEAT_START: f32 = 10.0;
+pub const HEAT_POS_INCREASE: f32 = 1.0;
 const HEAT_DECAY_COEFF: f32 = - 0.00015;
 
 pub fn heat_decay(heat: f32, time: NaiveDateTime, now: NaiveDateTime) -> f32 {
     let timespan = now
         .signed_duration_since(time)
-        .num_minutes();
+        .num_seconds(); //TODO CHANGE TO MINUTES
 
     heat * (HEAT_DECAY_COEFF * timespan as f32).exp()
 }

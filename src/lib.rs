@@ -52,7 +52,7 @@ fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind
     };
 
     diesel::insert_into(actions)
-        .values(Action::new(action_key, action))
+        .values(Action::new(action_key, &action))
         .execute(conn)
         .expect("Error creating new action!");
 
@@ -65,12 +65,15 @@ fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind
 
     let now = Local::now().naive_local();
 
-    diesel::update(memes::table)
-        .filter(memes::memeid.eq(action_key.0))
-        .set((memes::heat.eq(rating::heat_decay(currheat, last_action, now)),
-            memes::last_action.eq(now)))
-        .execute(conn)
-        .expect("Error updating heat");
+    if action == ActionKind::Upvote {
+        diesel::update(memes::table)
+            .filter(memes::memeid.eq(action_key.0))
+            .set((memes::heat.eq(rating::heat_decay(currheat, last_action, now) + rating::HEAT_POS_INCREASE),
+                memes::last_action.eq(now)))
+            .execute(conn)
+            .expect("Error updating heat");
+    }
+    
     
     // TODO SUBSTITUTE WITH SQL FUNCTIONS AND TRIGGERS
     
@@ -243,6 +246,21 @@ pub fn memes_by_tag_score_ordered(conn: &PgConnection, tagid: i32) -> Vec<Meme> 
         .order_by(memes::score.desc())
         .load::<Meme>(conn)
         .expect("Error retrieving memes by tag")
+}
+
+pub fn memes_by_heat<'a>(conn: &PgConnection, quantity: usize) -> Vec<Meme> {
+    let mut allmemes : Vec<Meme> = memes::table
+        .load::<Meme>(conn)
+        .expect("Error loading memes");
+
+    let now = Local::now().naive_local();
+    for mut meme in allmemes.iter_mut() {
+        meme.heat = rating::heat_decay(meme.heat, meme.last_action, now)
+    }
+
+    allmemes.sort_unstable_by(|b, a| a.heat.partial_cmp(&b.heat).unwrap_or(std::cmp::Ordering::Equal));
+    allmemes.truncate(quantity);
+    allmemes
 }
 
 #[cfg(test)]

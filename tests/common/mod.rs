@@ -75,6 +75,12 @@ pub fn print_users_test(conn: &PgConnection) {
     }
 }
 
+pub fn print_hot(conn: &PgConnection) {
+    for mm in memes_by_heat(conn, 10) {
+        println!("{:?}", mm);
+    }
+}
+
 pub fn print_meta_test(conn: &PgConnection) {
     let results = actions::table
         .load::<Action>(conn)
