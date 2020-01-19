@@ -88,9 +88,10 @@ impl Action {
     }
     ///Get the type of action
     pub fn get_action_kind(&self) -> ActionKind {
-        match self.is_upvote {
-            true => ActionKind::Upvote,
-            false => ActionKind::Downvote,
+        if self.is_upvote {
+            ActionKind::Upvote
+        } else {
+            ActionKind::Downvote
         }
     }
 }

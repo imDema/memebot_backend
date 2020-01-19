@@ -9,6 +9,13 @@ table! {
 }
 
 table! {
+    meme_tags (tagid, memeid) {
+        tagid -> Int4,
+        memeid -> Int4,
+    }
+}
+
+table! {
     memes (memeid) {
         memeid -> Int4,
         author -> Int4,
@@ -19,13 +26,6 @@ table! {
         heat -> Float4,
         last_action -> Timestamp,
         posted_at -> Timestamp,
-    }
-}
-
-table! {
-    meme_tags (tagid, memeid) {
-        tagid -> Int4,
-        memeid -> Int4,
     }
 }
 
@@ -54,8 +54,8 @@ joinable!(memes -> users (author));
 
 allow_tables_to_appear_in_same_query!(
     actions,
-    memes,
     meme_tags,
+    memes,
     tags,
     users,
 );
