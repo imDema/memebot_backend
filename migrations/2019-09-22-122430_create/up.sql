@@ -1,6 +1,6 @@
 -- Your SQL goes here
 CREATE TABLE users (
-    userid SERIAL PRIMARY KEY,
+    userid INTEGER PRIMARY KEY,
     username VARCHAR NOT NULL,
     userupvote INTEGER NOT NULL,
     userdownvote INTEGER NOT NULL,

@@ -2,7 +2,7 @@ use super::*;
 use std::io::{Write, BufRead};
 
 pub const HELPMESSAGE: &str = "COMMANDS:
-adduser USERNAME\taddmeme IMAGE AUTHORID
+adduser USERID USERNAME\taddmeme IMAGE AUTHORID
 addtag TAGNAME\taddmemetag MEMEID TAGID
 upvote MEMEID FROMUSERID\tdownvote MEMEID FROMUSERID
 print\tprintmeta\tprinttags\tprintuser\tprinthot
@@ -10,11 +10,18 @@ delmeme MEMEID
 help";
 
 pub fn create_user_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>) -> Result<(), String>{
-    if let Some(w) = words.next() {
-        create_user(conn, w)
-            .map_err(|err| format!("Error creating user: {}", err))
+    if let Some(id) = words.next() {
+        if let Some(name) = words.next() {
+            let userid = id.parse::<i32>().map_err(|_| "Error parsing userid".to_owned())?;
+            let new_user = NewUser::new(userid, name);
+            create_user(conn, new_user)
+                .map_err(|err| format!("Error creating user: {}", err))
+        }
+        else {
+            Err("Missing argument USERNAME".to_owned())
+        }
     } else {
-        Err("Missing argument USERNAME".to_owned())
+        Err("Missing arguments USERID USERNAME".to_owned())
     }
 }
 
@@ -33,7 +40,7 @@ pub fn create_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item 
     }
 }
 
-pub fn print_test<'a, T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String>{
+pub fn print_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String>{
 
     let results = users::table
         .order(users::userscore.desc())
@@ -58,13 +65,14 @@ pub fn print_test<'a, T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<
 pub fn print_tag_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String> {
     let tgs = tags::table
         .select((tags::tagid, tags::tagname))
-        .get_results::<(i32, String)>(conn)
+        .load::<(i32, String)>(conn)
         .map_err(|err|  format!("Error loading tags: {}", err))?;
 
     for t in tgs {
         writeln!(out_str, "{:?}", &t).unwrap();
 
-        let mms = memes_by_tag_score_ordered(conn, t.0);
+        let mms = memes_by_tag_score_ordered(conn, t.0)
+            .map_err(|err|  format!("Error loading memes: {}", err))?;
         for meme in mms.iter() {
             writeln!(out_str, "{:?}", meme).unwrap();
         }
@@ -76,7 +84,7 @@ pub fn print_users_test<T: Write>(conn: &PgConnection, out_str: &mut T)  -> Resu
     let results = users::table
         .order(users::userscore.desc())
         .load::<User>(conn)
-        .map_err(|err| format!("Error loading users: {}", err));
+        .map_err(|err| format!("Error loading users: {}", err))?;
 
     for user in results {
         writeln!(out_str, "{:?}", user).unwrap();
@@ -276,5 +284,11 @@ impl Cli {
     }
     pub fn connection(&self) -> &PgConnection {
         &self.conn
+    }
+}
+
+impl Default for Cli {
+    fn default() -> Self {
+        Self::new()
     }
 }

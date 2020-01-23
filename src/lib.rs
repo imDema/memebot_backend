@@ -28,25 +28,57 @@ pub fn establish_connection() -> PgConnection {
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
 
     let conn = PgConnection::establish(&db_url)
-        .expect(&format!("Error connecting to database {}", db_url));
+        .unwrap_or_else(|_| panic!("Error connecting to database {}", db_url));
 
     embedded_migrations::run(&conn).unwrap();
     conn
 }
 
+///Read database url from .env and connect to it
+pub fn establish_connection_pool() -> diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>> {
+    dotenv().ok();
+
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
+
+    let conn_man = diesel::r2d2::ConnectionManager::new(db_url);
+    
+    let pool = diesel::r2d2::Pool::new(conn_man)
+        .unwrap_or_else(|_| panic!("Error connecting to database"));
+
+    embedded_migrations::run(&pool.clone().get().unwrap()).unwrap();
+    pool
+}
+
 /// Add a new user with username `username` to database
-pub fn create_user(conn: &PgConnection, username: &str) -> QueryResult<()> {
-    let new_user = NewUser::new(username);
-    diesel::insert_into(users::table)
-        .values(&new_user)
+pub fn create_user(conn: &PgConnection, new_user: NewUser) -> QueryResult<()> {
+    use schema::users::dsl::*;
+    diesel::insert_into(users)
+        .values((
+            &new_user,
+            userupvote.eq(0),
+            userdownvote.eq(0),
+            userscore.eq(rating::score(0, 0)))
+        )
         .execute(conn)?;
     Ok(())
 }
 
 /// Add a new meme to database
 pub fn create_meme(conn: &PgConnection, meme: NewMeme) -> QueryResult<()>{
-    diesel::insert_into(memes::table)
-        .values(&meme)
+    use schema::memes::dsl::*;
+
+    let now = Local::now().naive_local();
+
+    diesel::insert_into(memes)
+        .values((
+            &meme,
+            upvote.eq(0),
+            downvote.eq(0),
+            score.eq(rating::score(0, 0)),
+            heat.eq(rating::HEAT_START),
+            last_action.eq(&now),
+            posted_at.eq(&now),
+        ))
         .execute(conn)?;
     Ok(())
 }
@@ -270,13 +302,25 @@ pub fn memes_by_heat(conn: &PgConnection, quantity: usize) -> QueryResult<Vec<Me
     Ok(allmemes)
 }
 
+/// For testing purposes
+pub fn all_users(conn: &PgConnection) -> QueryResult<Vec<User>> {
+    users::table
+        .load::<User>(conn)
+}
+
+/// For testing purposes
+pub fn all_memes(conn: &PgConnection) -> QueryResult<Vec<Meme>> {
+    memes::table
+        .load::<Meme>(conn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_create_tag() {
-        let mut s = String::new();
-        std::io::stdin().read_line(&mut s).unwrap();
-        create_tag(&establish_connection(), &s[..s.len() - 1]);
-    }
+    // #[test]
+    // fn test_create_tag() {
+    //     let mut s = String::new();
+    //     std::io::stdin().read_line(&mut s).unwrap();
+    //     create_tag(&establish_connection(), &s[..s.len() - 1]);
+    // }
 }

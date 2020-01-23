@@ -1,10 +1,10 @@
 use chrono::prelude::*;
 
 use super::schema::*;
-use super::rating;
 
-#[derive(Debug)]
-#[derive(Queryable)]
+use serde_derive::{Serialize, Deserialize};
+
+#[derive(Queryable, Serialize, Debug)]
 pub struct Meme {
     pub memeid: i32,
     pub authorid: i32,
@@ -17,8 +17,7 @@ pub struct Meme {
     pub posted_at: NaiveDateTime,
 }
 
-#[derive(Debug)]
-#[derive(Queryable)]
+#[derive(Queryable, Serialize, Debug)]
 pub struct User {
     pub userid: i32,
     pub username: String,
@@ -27,9 +26,7 @@ pub struct User {
     pub userscore: f32,
 }
 
-#[derive(Debug)]
-#[derive(Queryable)]
-#[derive(Insertable)]
+#[derive(Insertable, Queryable, Serialize, Debug)]
 pub struct Action {
     memeid: i32,
     userid: i32,
@@ -102,37 +99,32 @@ impl MemeTag {
     }
 }
 
-#[derive(Insertable)]
+// pub struct NewAction {
+//     action_key: (i32, i32),
+//     action: ActionKind,
+// }
+
+#[derive(Insertable, Deserialize)]
 #[table_name="users"]
 pub struct NewUser {
+    userid: i32,
     username: String,
-    userupvote: i32,
-    userdownvote: i32,
-    userscore: f32,
 }
 
 impl NewUser {
-    pub fn new(username: &str) -> NewUser {
+    pub fn new(userid: i32, username: &str) -> NewUser {
         NewUser {
+            userid,
             username: username.to_owned(),
-            userupvote: 0,
-            userdownvote: 0,
-            userscore: rating::score(0, 0),
         }
     }
 }
 
-#[derive(Insertable)]
+#[derive(Insertable, Deserialize)]
 #[table_name="memes"]
 pub struct NewMeme {
     author: i32,
     image: String,
-    upvote: i32,
-    downvote: i32,
-    score: f32,
-    heat: f32,
-    last_action: NaiveDateTime,
-    posted_at: NaiveDateTime,
 }
 
 impl NewMeme {
@@ -140,12 +132,32 @@ impl NewMeme {
         NewMeme {
             author,
             image: img.to_owned(),
-            upvote: 0,
-            downvote: 0,
-            score: rating::score(0, 0),
-            heat: 10.0,
-            last_action: Local::now().naive_local(),
-            posted_at: Local::now().naive_local(),
         }
+    }
+
+    // pub fn to_meme(&self) -> Meme {
+    //     Meme {
+    //         memeid: 0,
+    //         authorid: self.author,
+    //         image: self.image,
+    //         posted_at: self.posted_at,
+    //         upvote: 0,
+    //         downvote: 0,
+    //         score: rating::score(0, 0),
+    //         heat: 10.0,
+    //         last_action: Local::now().naive_local(),
+    //     }
+    // }
+}
+
+//TODO DELETE
+#[derive(Serialize)]
+pub struct AllTest  {
+    users: Vec<User>, 
+    memes: Vec<Meme>,
+}
+impl AllTest {
+    pub fn new (users: Vec<User>, memes: Vec<Meme>,) -> Self {
+        Self{users, memes}
     }
 }
