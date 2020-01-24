@@ -139,7 +139,7 @@ pub fn upvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a
     }.parse::<i32>();
 
     match (memeid, userid) {
-        (Ok(meid), Ok(usid)) => meme_action(conn, meid, usid, ActionKind::Upvote).map_err(|err| format!("Error applying action: {}", err)),
+        (Ok(meid), Ok(usid)) => new_action(conn, NewAction::new_upvote(meid, usid)).map_err(|err| format!("Error applying action: {}", err)),
         (Err(_), _) => Err("Error parsing memeid".to_owned()),
         (_, Err(_)) => Err("Error parsing userid".to_owned()),
     }
@@ -157,7 +157,7 @@ pub fn downvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &
     }.parse::<i32>();
 
     match (memeid, userid) {
-        (Ok(meid), Ok(usid)) => meme_action(conn, meid, usid, ActionKind::Downvote).map_err(|err|  format!("Error applying action: {}", err)),
+        (Ok(meid), Ok(usid)) => new_action(conn, NewAction::new_downvote(meid, usid)).map_err(|err|  format!("Error applying action: {}", err)),
         (Err(_), _) => Err("Error parsing memeid".to_owned()),
         (_, Err(_)) => Err("Error parsing userid".to_owned()),
     }

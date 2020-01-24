@@ -40,8 +40,8 @@ pub struct Action {
 #[derive(Insertable)]
 #[table_name="meme_tags"]
 pub struct MemeTag {
-    memeid: i32,
     tagid: i32,
+    memeid: i32,
 }
 
 #[derive(PartialEq)]
@@ -60,18 +60,6 @@ impl ActionKind {
 }
 
 impl Action {
-    pub fn new((memeid, userid) : (i32, i32), action: &ActionKind) -> Action {
-        Action {
-            memeid,
-            userid,
-            is_upvote: match action {
-                ActionKind::Upvote => true,
-                ActionKind::Downvote => false,
-            },
-            is_active: true,
-            posted_at: Local::now().naive_local(),
-        }
-    }
     ///Returns (memeid, userid) tuple for this action
     pub fn get_key(&self) -> (i32,i32) {
         (self.memeid, self.userid)
@@ -84,7 +72,7 @@ impl Action {
         self.posted_at
     }
     ///Get the type of action
-    pub fn get_action_kind(&self) -> ActionKind {
+    pub fn action_kind(&self) -> ActionKind {
         if self.is_upvote {
             ActionKind::Upvote
         } else {
@@ -148,6 +136,45 @@ impl NewMeme {
     //         last_action: Local::now().naive_local(),
     //     }
     // }
+}
+
+#[derive(Serialize, Insertable)]
+#[table_name="actions"]
+pub struct NewAction {
+    pub memeid: i32,
+    pub userid: i32,
+    pub is_upvote: bool,
+}
+
+impl NewAction {
+    pub fn action_kind(&self) -> ActionKind {
+        if self.is_upvote {
+            ActionKind::Upvote
+        } else {
+            ActionKind::Downvote
+        }
+    }
+
+    pub fn new_upvote(memeid: i32, userid: i32) -> Self {
+        Self{
+            memeid,
+            userid,
+            is_upvote: true,
+        }
+    }
+    pub fn new_downvote(memeid: i32, userid: i32) -> Self {
+        Self {
+            memeid,
+            userid,
+            is_upvote: false,
+        }
+    }
+    pub fn new(memeid: i32, userid: i32, action: ActionKind) -> Self {
+        match action {
+            ActionKind::Upvote => Self::new_upvote(memeid, userid),
+            ActionKind::Downvote => Self::new_downvote(memeid, userid),
+        }
+    }
 }
 
 //TODO DELETE

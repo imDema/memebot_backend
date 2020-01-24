@@ -1,9 +1,9 @@
-adduser papaya
-adduser mango
-adduser avocado
-adduser mandarancio
-adduser kiwi
-adduser ananas
+adduser 1 papaya
+adduser 2 mango
+adduser 3 avocado
+adduser 4 mandarancio
+adduser 5 kiwi
+adduser 6 ananas
 addmeme butterfly.jpg 3
 addmeme caterpillar.jpg 3
 addmeme fly.jpg 4
@@ -12,9 +12,9 @@ addmeme centipede.jpg 5
 addmeme spider.jpg 3
 addmeme bumblebee.jpg 4
 addmeme wasp.jpg 5
-adduser calamaro
-adduser caltanissetta
-adduser capriolo
+adduser 7 calamaro
+adduser 8 caltanissetta
+adduser 9 capriolo
 addmeme urbano.jpg 4
 addmeme tombino.jpg 4
 addmeme urbino.jpg 4

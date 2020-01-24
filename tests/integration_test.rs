@@ -1,6 +1,5 @@
 use memebot_backend::*;
 use memebot_backend::cli::*;
-use std::io::{Write, BufRead};
 
 #[test]
 fn cli_test() {

@@ -83,28 +83,32 @@ pub fn create_meme(conn: &PgConnection, meme: NewMeme) -> QueryResult<()>{
     Ok(())
 }
 
-fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> QueryResult<(i32, i32)> {
+fn create_action(conn: &PgConnection, action: NewAction) -> QueryResult<(i32, i32)> {
     use schema::actions::dsl::*;
-    let change = match &action {
+    let change = match action.action_kind() {
         ActionKind::Upvote => (1, 0),
         ActionKind::Downvote => (0, 1),
     };
 
     diesel::insert_into(actions)
-        .values(Action::new(action_key, &action))
+        .values((
+            &action,
+            is_active.eq(true),
+            posted_at.eq(Local::now().naive_local()),
+        ))
         .execute(conn)?;
 
     // TODO SUBSTITUTE WITH SQL FUNCTIONS AND TRIGGERS
-    let (currheat, last_action) = memes::table
-        .filter(memes::memeid.eq(action_key.0))
-        .select((memes::heat, memes::last_action))
-        .get_result::<(f32, NaiveDateTime)>(conn)?;
+    if let ActionKind::Upvote = &action.action_kind() {
+        let (currheat, last_action) = memes::table
+            .filter(memes::memeid.eq(action.memeid))
+            .select((memes::heat, memes::last_action))
+            .get_result::<(f32, NaiveDateTime)>(conn)?;
 
-    let now = Local::now().naive_local();
+        let now = Local::now().naive_local();
 
-    if action == ActionKind::Upvote {
         diesel::update(memes::table)
-            .filter(memes::memeid.eq(action_key.0))
+            .filter(memes::memeid.eq(action.memeid))
             .set((
                 memes::heat
                     .eq(rating::heat_decay(currheat, last_action, now) + rating::HEAT_POS_INCREASE),
@@ -118,59 +122,55 @@ fn create_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind
 
 fn update_action(
     conn: &PgConnection,
-    action_key: (i32, i32),
-    action: ActionKind,
+    action: NewAction,
     existing_action: &Action,
 ) -> QueryResult<(i32, i32)> {
     use schema::actions::dsl::*;
 
     let select_query = diesel::update(actions)
-        .filter(memeid.eq(action_key.0))
-        .filter(userid.eq(action_key.1));
+        .filter(memeid.eq(action.memeid))
+        .filter(userid.eq(action.userid));
 
     if existing_action.is_active() {
-        if existing_action.get_action_kind() == action {
+        if existing_action.action_kind() == action.action_kind() {
             select_query
                 .set(is_active.eq(false))
                 .execute(conn)?;
-            match action {
+            match existing_action.action_kind() {
                 ActionKind::Upvote => Ok((-1, 0)),
                 ActionKind::Downvote => Ok((0, -1)),
             }
         } else {
             select_query
-                .set(is_upvote.eq(action.is_upvote()))
+                .set(is_upvote.eq(action.is_upvote))
                 .execute(conn)?;
-            match action {
+            match action.action_kind() {
                 ActionKind::Upvote => Ok((1, -1)),
                 ActionKind::Downvote => Ok((-1, 1)),
             }
         }
     } else {
         select_query
-            .set((is_active.eq(true), is_upvote.eq(action.is_upvote())))
+            .set((is_active.eq(true), is_upvote.eq(action.is_upvote)))
             .execute(conn)?;
-        match action {
+        match action.action_kind() {
             ActionKind::Upvote => Ok((1, 0)),
             ActionKind::Downvote => Ok((0, 1)),
         }
     }
 }
 
-fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind) -> QueryResult<(i32, i32)> {
+fn apply_action(conn: &PgConnection, action: NewAction) -> QueryResult<(i32, i32)> {
     use schema::actions::dsl::*;
     let existing_action = actions
-        .filter(memeid.eq(action_key.0))
-        .filter(userid.eq(action_key.1))
-        .load::<Action>(conn)?;
+        .filter(memeid.eq(action.memeid))
+        .filter(userid.eq(action.userid))
+        .get_result::<Action>(conn)
+        .optional()?;
 
-    match existing_action.len() {
-        0 => create_action(conn, action_key, action),
-        1 => update_action(conn, action_key, action, &existing_action[0]),
-        _ => panic!(format!(
-            "Found multiple actions for (memeid, userid): ({}, {})!",
-            action_key.0, action_key.1
-        )),
+    match existing_action {
+        None => create_action(conn, action),
+        Some(act) => update_action(conn, action, &act),
     }
 }
 
@@ -181,37 +181,39 @@ fn apply_action(conn: &PgConnection, action_key: (i32, i32), action: ActionKind)
 /// # Arguments
 /// * `memeid` id of the meme upvoted or downvoted
 /// * `userid` id of the user which did the action
-pub fn meme_action(conn: &PgConnection, memeid: i32, userid: i32, action: ActionKind) -> QueryResult<()> {
-    let action_key = (memeid, userid);
+pub fn new_action(conn: &PgConnection, action: NewAction) -> QueryResult<()> {
+    conn.transaction::<_,diesel::result::Error, _>(|| {
+        let memeid = action.memeid.clone();
+        let (upchange, downchange) = apply_action(conn, action)?;
 
-    let (upchange, downchange) = apply_action(conn, action_key, action)?;
+        let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+            .set((
+                memes::upvote.eq(memes::upvote + upchange),
+                memes::downvote.eq(memes::downvote + downchange),
+            ))
+            .get_result(conn)?;
 
-    let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set((
-            memes::upvote.eq(memes::upvote + upchange),
-            memes::downvote.eq(memes::downvote + downchange),
-        ))
-        .get_result(conn)?;
+        let user: User = diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
+            .set((
+                users::userupvote.eq(users::userupvote + upchange),
+                users::userdownvote.eq(users::userdownvote + downchange),
+            ))
+            .get_result(conn)?;
 
-    let user: User = diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
-        .set((
-            users::userupvote.eq(users::userupvote + upchange),
-            users::userdownvote.eq(users::userdownvote + downchange),
-        ))
-        .get_result(conn)?;
+        //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
+        let new_meme_score = rating::score(meme.upvote, meme.downvote);
+        let new_user_score = rating::score(user.userupvote, user.userdownvote);
 
-    //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
-    let new_meme_score = rating::score(meme.upvote, meme.downvote);
-    let new_user_score = rating::score(user.userupvote, user.userdownvote);
+        diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
+            .set(memes::score.eq(new_meme_score))
+            .execute(conn)?;
+        diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
+            .set(users::userscore.eq(new_user_score))
+            .execute(conn)?;
+        //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
 
-    diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
-        .set(memes::score.eq(new_meme_score))
-        .execute(conn)?;
-    diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
-        .set(users::userscore.eq(new_user_score))
-        .execute(conn)?;
-    //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
-
+        Ok(())
+    })?;
     Ok(())
 }
 
@@ -245,7 +247,7 @@ pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) -> QueryResult
 }
 
 /// Returns all memes with tag `tagid`
-pub fn memes_by_tag(conn: &PgConnection, tagid: i32) -> QueryResult<Vec<Meme>> {
+pub fn memes_by_tagid(conn: &PgConnection, tagid: i32) -> QueryResult<Vec<Meme>> {
     memes::dsl::memes
         .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::dsl::tags))
         .filter(tags::tagid.eq(tagid))
@@ -288,9 +290,9 @@ pub fn memes_by_heat(conn: &PgConnection, quantity: usize) -> QueryResult<Vec<Me
         .load::<Meme>(conn)?;
 
     let now = Local::now().naive_local();
-    for mut meme in allmemes.iter_mut() {
-        meme.heat = rating::heat_decay(meme.heat, meme.last_action, now)
-    }
+    
+    allmemes.iter_mut()
+        .for_each(|mut meme| meme.heat = rating::heat_decay(meme.heat, meme.last_action, now));
 
     allmemes.sort_unstable_by(|b, a| {
         a.heat
@@ -300,6 +302,18 @@ pub fn memes_by_heat(conn: &PgConnection, quantity: usize) -> QueryResult<Vec<Me
     allmemes.truncate(quantity);
     
     Ok(allmemes)
+}
+
+pub fn memes_by_userid(conn: &PgConnection, userid: i32) -> QueryResult<Vec<Meme>> {
+    memes::table
+        .filter(memes::author.eq(userid))
+        .load::<Meme>(conn)
+}
+
+pub fn user(conn: &PgConnection, userid: i32) -> QueryResult<User> {
+    users::table
+        .filter(users::userid.eq(userid))
+        .get_result(conn)
 }
 
 /// For testing purposes
