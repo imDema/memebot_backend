@@ -138,7 +138,7 @@ impl NewMeme {
     // }
 }
 
-#[derive(Serialize, Insertable)]
+#[derive(Deserialize, Insertable)]
 #[table_name="actions"]
 pub struct NewAction {
     pub memeid: i32,
