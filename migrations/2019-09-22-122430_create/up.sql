@@ -21,7 +21,7 @@ CREATE TABLE memes (
 );
 
 CREATE TABLE actions (
-    memeid INTEGER REFERENCES memes(memeid),
+    memeid INTEGER REFERENCES memes(memeid) ON DELETE CASCADE,
     userid INTEGER REFERENCES users(userid),
     is_upvote BOOLEAN NOT NULL,
     is_active BOOLEAN NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE tags (
 );
 
 CREATE TABLE meme_tags (
-    tagid INTEGER NOT NULL REFERENCES tags(tagid),
-    memeid INTEGER NOT NULL REFERENCES memes(memeid),
+    tagid INTEGER NOT NULL REFERENCES tags(tagid) ON DELETE CASCADE,
+    memeid INTEGER NOT NULL REFERENCES memes(memeid) ON DELETE CASCADE,
     PRIMARY KEY (tagid, memeid)
 );

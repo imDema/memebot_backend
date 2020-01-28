@@ -218,22 +218,22 @@ pub fn new_action(conn: &PgConnection, action: NewAction) -> QueryResult<()> {
 }
 
 /// Add a new tag with name `tagname` to database
-pub fn create_tag(conn: &PgConnection, tagname: &str) -> QueryResult<()> {
+pub fn create_tag(conn: &PgConnection, tagname: &str) -> QueryResult<Tag> {
     let saved_tag = tags::table
         .filter(tags::tagname.like(tagname))
-        .select(tags::tagid)
-        .get_result::<i32>(conn)
+        .get_result::<Tag>(conn)
         .optional()?;
 
     match saved_tag {
         None => {
-            diesel::insert_into(tags::table)
+            let new_tag = diesel::insert_into(tags::table)
                 .values(tags::tagname.eq(tagname))
-                .execute(conn)?;
+                .returning((tags::tagid, tags::tagname))
+                .get_result::<Tag>(conn)?;
+            Ok(new_tag)
         }
-        Some(id) => eprintln!("Tag already exists with id {}!", id),
-    };
-    Ok(())
+        Some(saved_tag) => Ok(saved_tag)
+    }
 }
 
 /// Add tag `tagid` to meme `memeid`
@@ -330,11 +330,5 @@ pub fn all_memes(conn: &PgConnection) -> QueryResult<Vec<Meme>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    // #[test]
-    // fn test_create_tag() {
-    //     let mut s = String::new();
-    //     std::io::stdin().read_line(&mut s).unwrap();
-    //     create_tag(&establish_connection(), &s[..s.len() - 1]);
-    // }
+    // use super::*;
 }

@@ -35,6 +35,13 @@ pub struct Action {
     posted_at: NaiveDateTime,
 }
 
+#[derive(Queryable,Serialize)]
+pub struct Tag {
+    pub tagid: i32,
+    pub tagname: String,
+}
+
+
 #[derive(Debug)]
 #[derive(Queryable)]
 #[derive(Insertable)]

@@ -171,6 +171,7 @@ pub fn create_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item =
     };
 
     create_tag(conn, tag)
+        .map(|_| ())
         .map_err(|err|  format!("Error creating tag: {}", err))
 }
 
