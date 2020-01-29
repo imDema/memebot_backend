@@ -42,13 +42,11 @@ pub struct Tag {
 }
 
 
-#[derive(Debug)]
-#[derive(Queryable)]
-#[derive(Insertable)]
+#[derive(Insertable, Queryable, Debug, Deserialize)]
 #[table_name="meme_tags"]
 pub struct MemeTag {
-    tagid: i32,
-    memeid: i32,
+    pub tagid: i32,
+    pub memeid: i32,
 }
 
 #[derive(PartialEq)]

@@ -27,7 +27,7 @@ const HEAT_DECAY_COEFF: f32 = - 0.00015;
 pub fn heat_decay(heat: f32, time: NaiveDateTime, now: NaiveDateTime) -> f32 {
     let timespan = now
         .signed_duration_since(time)
-        .num_seconds(); //TODO CHANGE TO MINUTES
+        .num_minutes();
 
     heat * (HEAT_DECAY_COEFF * timespan as f32).exp()
 }
