@@ -316,16 +316,19 @@ pub fn user(conn: &PgConnection, userid: i32) -> QueryResult<User> {
         .get_result(conn)
 }
 
-/// For testing purposes
 pub fn all_users(conn: &PgConnection) -> QueryResult<Vec<User>> {
     users::table
         .load::<User>(conn)
 }
 
-/// For testing purposes
 pub fn all_memes(conn: &PgConnection) -> QueryResult<Vec<Meme>> {
     memes::table
         .load::<Meme>(conn)
+}
+
+pub fn all_tags(conn: &PgConnection) -> QueryResult<Vec<Tag>> {
+    tags::table
+        .load::<Tag>(conn)
 }
 
 #[cfg(test)]
