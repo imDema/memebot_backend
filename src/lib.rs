@@ -2,56 +2,25 @@
 extern crate diesel;
 extern crate chrono;
 extern crate dotenv;
+#[macro_use]
+extern crate diesel_migrations;
 
 use chrono::prelude::*;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use dotenv::dotenv;
 use models::*;
 use schema::*;
-use std::env;
-
-#[macro_use]
-extern crate diesel_migrations;
 
 pub mod models;
 pub mod rating;
 pub mod schema;
 pub mod cli;
-
-embed_migrations!();
-
-///Read database url from .env and connect to it
-pub fn establish_connection() -> PgConnection {
-    dotenv().ok();
-
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
-
-    let conn = PgConnection::establish(&db_url)
-        .unwrap_or_else(|_| panic!("Error connecting to database {}", db_url));
-
-    embedded_migrations::run(&conn).unwrap();
-    conn
-}
-
-///Read database url from .env and connect to it
-pub fn establish_connection_pool() -> diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<PgConnection>> {
-    dotenv().ok();
-
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
-
-    let conn_man = diesel::r2d2::ConnectionManager::new(db_url);
-    
-    let pool = diesel::r2d2::Pool::new(conn_man)
-        .unwrap_or_else(|_| panic!("Error connecting to database"));
-
-    embedded_migrations::run(&pool.clone().get().unwrap()).unwrap();
-    pool
-}
+mod db;
 
 /// Add a new user with username `username` to database
-pub fn create_user(conn: &PgConnection, new_user: NewUser) -> QueryResult<()> {
+pub fn create_user(new_user: NewUser) -> QueryResult<()> {
     use schema::users::dsl::*;
+    let conn = conn!();
     diesel::insert_into(users)
         .values((
             &new_user,
@@ -59,13 +28,14 @@ pub fn create_user(conn: &PgConnection, new_user: NewUser) -> QueryResult<()> {
             userdownvote.eq(0),
             userscore.eq(rating::score(0, 0)))
         )
-        .execute(conn)?;
+        .execute(&conn)?;
     Ok(())
 }
 
 /// Add a new meme to database
-pub fn create_meme(conn: &PgConnection, meme: NewMeme) -> QueryResult<()>{
+pub fn create_meme(meme: NewMeme) -> QueryResult<()>{
     use schema::memes::dsl::*;
+    let conn = conn!();
 
     let now = Local::now().naive_local();
 
@@ -79,7 +49,7 @@ pub fn create_meme(conn: &PgConnection, meme: NewMeme) -> QueryResult<()>{
             last_action.eq(&now),
             posted_at.eq(&now),
         ))
-        .execute(conn)?;
+        .execute(&conn)?;
     Ok(())
 }
 
@@ -181,24 +151,25 @@ fn apply_action(conn: &PgConnection, action: NewAction) -> QueryResult<(i32, i32
 /// # Arguments
 /// * `memeid` id of the meme upvoted or downvoted
 /// * `userid` id of the user which did the action
-pub fn new_action(conn: &PgConnection, action: NewAction) -> QueryResult<()> {
+pub fn new_action(action: NewAction) -> QueryResult<()> {
+    let conn = conn!();
     conn.transaction::<_,diesel::result::Error, _>(|| {
         let memeid = action.memeid.clone();
-        let (upchange, downchange) = apply_action(conn, action)?;
+        let (upchange, downchange) = apply_action(&conn, action)?;
 
         let meme: Meme = diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
             .set((
                 memes::upvote.eq(memes::upvote + upchange),
                 memes::downvote.eq(memes::downvote + downchange),
             ))
-            .get_result(conn)?;
+            .get_result(&conn)?;
 
         let user: User = diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
             .set((
                 users::userupvote.eq(users::userupvote + upchange),
                 users::userdownvote.eq(users::userdownvote + downchange),
             ))
-            .get_result(conn)?;
+            .get_result(&conn)?;
 
         //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
         let new_meme_score = rating::score(meme.upvote, meme.downvote);
@@ -206,10 +177,10 @@ pub fn new_action(conn: &PgConnection, action: NewAction) -> QueryResult<()> {
 
         diesel::update(memes::table.filter(memes::memeid.eq(memeid)))
             .set(memes::score.eq(new_meme_score))
-            .execute(conn)?;
+            .execute(&conn)?;
         diesel::update(users::table.filter(users::userid.eq(meme.authorid)))
             .set(users::userscore.eq(new_user_score))
-            .execute(conn)?;
+            .execute(&conn)?;
         //TODO REPLACE THIS WITH SQL FUNCTION / TRIGGER
 
         Ok(())
@@ -218,10 +189,12 @@ pub fn new_action(conn: &PgConnection, action: NewAction) -> QueryResult<()> {
 }
 
 /// Add a new tag with name `tagname` to database
-pub fn create_tag(conn: &PgConnection, tagname: &str) -> QueryResult<Tag> {
+pub fn create_tag(tagname: &str) -> QueryResult<Tag> {
+    let conn = conn!();
+    conn.transaction( || {
     let saved_tag = tags::table
         .filter(tags::tagname.like(tagname))
-        .get_result::<Tag>(conn)
+        .get_result::<Tag>(&conn)
         .optional()?;
 
     match saved_tag {
@@ -229,25 +202,28 @@ pub fn create_tag(conn: &PgConnection, tagname: &str) -> QueryResult<Tag> {
             let new_tag = diesel::insert_into(tags::table)
                 .values(tags::tagname.eq(tagname))
                 .returning((tags::tagid, tags::tagname))
-                .get_result::<Tag>(conn)?;
+                .get_result::<Tag>(&conn)?;
             Ok(new_tag)
         }
         Some(saved_tag) => Ok(saved_tag)
     }
+    })
 }
 
 /// Add tag `tagid` to meme `memeid`
-pub fn add_meme_tag(conn: &PgConnection, memeid: i32, tagid: i32) -> QueryResult<()> {
+pub fn add_meme_tag(memeid: i32, tagid: i32) -> QueryResult<()> {
+    let conn = conn!();
     diesel::insert_into(meme_tags::table)
         .values(MemeTag::new(memeid, tagid))
         .on_conflict((meme_tags::memeid, meme_tags::tagid))
         .do_nothing()
-        .execute(conn)?;
+        .execute(&conn)?;
     Ok(())
 }
 
 /// Returns all memes with tag `tagid`
-pub fn memes_by_tagid(conn: &PgConnection, tagid: i32) -> QueryResult<Vec<Meme>> {
+pub fn memes_by_tagid(tagid: i32) -> QueryResult<Vec<Meme>> {
+    let conn = conn!();
     memes::dsl::memes
         .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::dsl::tags))
         .filter(tags::tagid.eq(tagid))
@@ -262,11 +238,12 @@ pub fn memes_by_tagid(conn: &PgConnection, tagid: i32) -> QueryResult<Vec<Meme>>
             memes::last_action,
             memes::posted_at,
         ))
-        .load::<Meme>(conn)
+        .load::<Meme>(&conn)
 }
 
 /// Returns all memes with tag `tagid` ordered by score
-pub fn memes_by_tag_score_ordered(conn: &PgConnection, tagid: i32) -> QueryResult<Vec<Meme>> {
+pub fn memes_by_tag_score_ordered(tagid: i32) -> QueryResult<Vec<Meme>> {
+    let conn = conn!();
     memes::dsl::memes
         .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::dsl::tags))
         .filter(tags::tagid.eq(tagid))
@@ -282,12 +259,13 @@ pub fn memes_by_tag_score_ordered(conn: &PgConnection, tagid: i32) -> QueryResul
             memes::posted_at,
         ))
         .order_by(memes::score.desc())
-        .load::<Meme>(conn)
+        .load::<Meme>(&conn)
 }
 
-pub fn memes_by_heat(conn: &PgConnection, quantity: usize) -> QueryResult<Vec<Meme>> {
+pub fn memes_by_heat(quantity: usize) -> QueryResult<Vec<Meme>> {
+    let conn = conn!();
     let mut allmemes: Vec<Meme> = memes::table
-        .load::<Meme>(conn)?;
+        .load::<Meme>(&conn)?;
 
     let now = Local::now().naive_local();
     
@@ -304,31 +282,36 @@ pub fn memes_by_heat(conn: &PgConnection, quantity: usize) -> QueryResult<Vec<Me
     Ok(allmemes)
 }
 
-pub fn memes_by_userid(conn: &PgConnection, userid: i32) -> QueryResult<Vec<Meme>> {
+pub fn memes_by_userid(userid: i32) -> QueryResult<Vec<Meme>> {
+    let conn = conn!();
     memes::table
         .filter(memes::author.eq(userid))
-        .load::<Meme>(conn)
+        .load::<Meme>(&conn)
 }
 
-pub fn user(conn: &PgConnection, userid: i32) -> QueryResult<User> {
+pub fn user(userid: i32) -> QueryResult<User> {
+    let conn = conn!();
     users::table
         .filter(users::userid.eq(userid))
-        .get_result(conn)
+        .get_result(&conn)
 }
 
-pub fn all_users(conn: &PgConnection) -> QueryResult<Vec<User>> {
+pub fn all_users() -> QueryResult<Vec<User>> {
+    let conn = conn!();
     users::table
-        .load::<User>(conn)
+        .load::<User>(&conn)
 }
 
-pub fn all_memes(conn: &PgConnection) -> QueryResult<Vec<Meme>> {
+pub fn all_memes() -> QueryResult<Vec<Meme>> {
+    let conn = conn!();
     memes::table
-        .load::<Meme>(conn)
+        .load::<Meme>(&conn)
 }
 
-pub fn all_tags(conn: &PgConnection) -> QueryResult<Vec<Tag>> {
+pub fn all_tags() -> QueryResult<Vec<Tag>> {
+    let conn = conn!();
     tags::table
-        .load::<Tag>(conn)
+        .load::<Tag>(&conn)
 }
 
 #[cfg(test)]

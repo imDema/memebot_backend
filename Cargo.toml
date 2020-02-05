@@ -13,6 +13,7 @@ dotenv = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
+lazy_static = "1.4"
 
 [profile.release]
 lto = true

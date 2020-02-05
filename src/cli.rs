@@ -9,12 +9,12 @@ print\tprintmeta\tprinttags\tprintuser\tprinthot
 delmeme MEMEID
 help";
 
-pub fn create_user_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>) -> Result<(), String>{
+pub fn create_user_test<'a> (mut words: impl Iterator<Item = &'a str>) -> Result<(), String>{
     if let Some(id) = words.next() {
         if let Some(name) = words.next() {
             let userid = id.parse::<i32>().map_err(|_| "Error parsing userid".to_owned())?;
             let new_user = NewUser::new(userid, name);
-            create_user(conn, new_user)
+            create_user(new_user)
                 .map_err(|err| format!("Error creating user: {}", err))
         }
         else {
@@ -25,12 +25,12 @@ pub fn create_user_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item 
     }
 }
 
-pub fn create_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>) -> Result<(), String>{
+pub fn create_meme_test<'a> (mut words: impl Iterator<Item = &'a str>) -> Result<(), String>{
     if let Some(image) = words.next() {
         if let Some(authorid) = words.next() {
             let id = authorid.parse::<i32>()
                 .map_err(|_| "Cannot parse AUTHORID".to_owned())?;
-            create_meme(conn, NewMeme::new(image, id))
+            create_meme(NewMeme::new(image, id))
                 .map_err(|err| format!("{}", err))
         } else {
             Err("Invalid or missing arguments".to_owned())
@@ -40,11 +40,11 @@ pub fn create_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item 
     }
 }
 
-pub fn print_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String>{
-
+pub fn print_test<T: Write>(out_str: &mut T) -> Result<(), String>{
+    let conn = conn!();
     let results = users::table
         .order(users::userscore.desc())
-        .load::<User>(conn)
+        .load::<User>(&conn)
         .map_err(|err| format!("Error loading users: {}", err))?;
 
     for user in results {
@@ -52,7 +52,7 @@ pub fn print_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), 
         let memeresults = memes::table
             .filter(memes::author.eq(user.userid))
             .order(memes::score.desc())
-            .load::<Meme>(conn)
+            .load::<Meme>(&conn)
             .map_err(|err|  format!("Error loading memes: {}", err))?;
 
         for meme in memeresults {
@@ -62,16 +62,17 @@ pub fn print_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), 
     Ok(())
 }
 
-pub fn print_tag_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String> {
+pub fn print_tag_test<T: Write>(out_str: &mut T) -> Result<(), String> {
+    let conn = conn!();
     let tgs = tags::table
         .select((tags::tagid, tags::tagname))
-        .load::<(i32, String)>(conn)
+        .load::<(i32, String)>(&conn)
         .map_err(|err|  format!("Error loading tags: {}", err))?;
 
     for t in tgs {
         writeln!(out_str, "{:?}", &t).unwrap();
 
-        let mms = memes_by_tag_score_ordered(conn, t.0)
+        let mms = memes_by_tag_score_ordered(t.0)
             .map_err(|err|  format!("Error loading memes: {}", err))?;
         for meme in mms.iter() {
             writeln!(out_str, "{:?}", meme).unwrap();
@@ -80,10 +81,11 @@ pub fn print_tag_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<
     Ok(())
 }
 
-pub fn print_users_test<T: Write>(conn: &PgConnection, out_str: &mut T)  -> Result<(), String> {
+pub fn print_users_test<T: Write>(out_str: &mut T)  -> Result<(), String> {
+    let conn = conn!();
     let results = users::table
         .order(users::userscore.desc())
-        .load::<User>(conn)
+        .load::<User>(&conn)
         .map_err(|err| format!("Error loading users: {}", err))?;
 
     for user in results {
@@ -92,14 +94,15 @@ pub fn print_users_test<T: Write>(conn: &PgConnection, out_str: &mut T)  -> Resu
     Ok(())
 }
 
-pub fn print_hot<T: Write>(conn: &PgConnection, out_str: &mut T)  -> Result<(), String> {
-    for mm in memes_by_heat(conn, 10).map_err(|e| format!("{}",e))? {
+pub fn print_hot<T: Write>(out_str: &mut T)  -> Result<(), String> {
+    for mm in memes_by_heat(10).map_err(|e| format!("{}",e))? {
         writeln!(out_str, "{:?}", mm).unwrap();
     }
     Ok(())
 }
 
-pub fn print_meta_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result<(), String> {
+pub fn print_meta_test<T: Write>(out_str: &mut T) -> Result<(), String> {
+    let conn = &conn!();
     let results = actions::table
         .load::<Action>(conn)
         .map_err(|err| format!("Error loading likes: {}", err))?;
@@ -127,7 +130,7 @@ pub fn print_meta_test<T: Write>(conn: &PgConnection, out_str: &mut T) -> Result
     Ok(())
 }
 
-pub fn upvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+pub fn upvote_test<'a> (mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
     let memeid = match words.next() {
         Some(w) => w,
         None => return Err("Not enough arguments".to_owned()),
@@ -139,13 +142,13 @@ pub fn upvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a
     }.parse::<i32>();
 
     match (memeid, userid) {
-        (Ok(meid), Ok(usid)) => new_action(conn, NewAction::new_upvote(meid, usid)).map_err(|err| format!("Error applying action: {}", err)),
+        (Ok(meid), Ok(usid)) => new_action(NewAction::new_upvote(meid, usid)).map_err(|err| format!("Error applying action: {}", err)),
         (Err(_), _) => Err("Error parsing memeid".to_owned()),
         (_, Err(_)) => Err("Error parsing userid".to_owned()),
     }
 }
 
-pub fn downvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+pub fn downvote_test<'a> (mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
     let memeid = match words.next() {
         Some(w) => w,
         None => return Err("Not enough arguments".to_owned()),
@@ -157,25 +160,25 @@ pub fn downvote_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &
     }.parse::<i32>();
 
     match (memeid, userid) {
-        (Ok(meid), Ok(usid)) => new_action(conn, NewAction::new_downvote(meid, usid)).map_err(|err|  format!("Error applying action: {}", err)),
+        (Ok(meid), Ok(usid)) => new_action(NewAction::new_downvote(meid, usid)).map_err(|err|  format!("Error applying action: {}", err)),
         (Err(_), _) => Err("Error parsing memeid".to_owned()),
         (_, Err(_)) => Err("Error parsing userid".to_owned()),
     }
 }
 
 
-pub fn create_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+pub fn create_tag_test<'a> (mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
     let tag = match words.next() {
         Some(w) => w,
         None => return Err("Not enough arguments".to_owned()),
     };
 
-    create_tag(conn, tag)
+    create_tag(tag)
         .map(|_| ())
         .map_err(|err|  format!("Error creating tag: {}", err))
 }
 
-pub fn add_meme_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+pub fn add_meme_tag_test<'a> (mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
     let memeid = match words.next() {
         Some(w) => w,
         None => return Err("Not enough arguments".to_owned()),
@@ -187,7 +190,7 @@ pub fn add_meme_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item
     }.parse::<i32>();
 
     match (memeid, tagid) {
-        (Ok(meid), Ok(tgid)) => add_meme_tag(conn, meid, tgid)
+        (Ok(meid), Ok(tgid)) => add_meme_tag(meid, tgid)
                                     .map_err(|err|  format!("Error adding tag: {}", err)),
         (Err(_), _) => Err("Error parsing memeid".to_owned()),
         (_, Err(_)) => Err("Error parsing userid".to_owned()),
@@ -195,7 +198,8 @@ pub fn add_meme_tag_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item
 }
 
 /// Trash code, very temporary
-pub fn delete_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+pub fn delete_meme_test<'a> (mut words: impl Iterator<Item = &'a str>)  -> Result<(), String> {
+    let conn = conn!();
     let memeid = match words.next() {
         Some(w) => w,
         None => return Err("Not enough arguments".to_owned()),
@@ -207,15 +211,15 @@ pub fn delete_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item 
     };
     
     let meem = memes::table.filter(memes::memeid.eq(id))
-        .get_result::<Meme>(conn)
+        .get_result::<Meme>(&conn)
         .map_err(|err|  format!("Error loading meme: {}", err))?;
     
     let user: User = users::table.filter(users::userid.eq(meem.authorid))
-        .get_result::<User>(conn)
+        .get_result::<User>(&conn)
         .map_err(|err|  format!("Error deleting meme: {}", err))?;
 
     diesel::delete(actions::table.filter(actions::memeid.eq(id)))
-        .execute(conn)
+        .execute(&conn)
         .map_err(|err|  format!("Error deleting actions: {}", err))?;
     
     diesel::update(users::table.filter(users::userid.eq(meem.authorid)))
@@ -224,16 +228,16 @@ pub fn delete_meme_test<'a> (conn: &PgConnection, mut words: impl Iterator<Item 
             users::userdownvote.eq(user.userdownvote - meem.downvote),
             users::userscore.eq(rating::score(user.userupvote - meem.upvote, user.userdownvote - meem.downvote)),
             ))
-        .execute(conn)
+        .execute(&conn)
         .map_err(|err|  format!("Error updating user score: {}", err))?;
 
     diesel::delete(memes::table.filter(memes::memeid.eq(id)))
-        .execute(conn)
+        .execute(&conn)
         .map_err(|err|  format!("Error deleting meme: {}", err))?;
     Ok(())
 }
 
-pub fn switcher<R: BufRead, W: Write>(conn: &PgConnection, in_str: &mut R, out_str: &mut W) {
+pub fn switcher<R: BufRead, W: Write>(in_str: &mut R, out_str: &mut W) {
     let mut input = String::new();
 
     writeln!(out_str, "{}", HELPMESSAGE).unwrap();
@@ -248,18 +252,18 @@ pub fn switcher<R: BufRead, W: Write>(conn: &PgConnection, in_str: &mut R, out_s
         let mut words = input[..input.len()-1].split(' ');
 
         let command_result = match words.next() {
-            Some("adduser") => create_user_test(&conn, words),
-            Some("addmeme") => create_meme_test(&conn, words),
-            Some("addtag") => create_tag_test(&conn, words),
-            Some("addmemetag") => add_meme_tag_test(&conn, words),
-            Some("upvote") => upvote_test(&conn, words),
-            Some("downvote") => downvote_test(&conn, words),
-            Some("delmeme") => delete_meme_test(&conn, words),
-            Some("print") => print_test(&conn, out_str),
-            Some("printuser") => print_users_test(&conn, out_str),
-            Some("printtags") => print_tag_test(&conn, out_str),
-            Some("printmeta") => print_meta_test(&conn, out_str),
-            Some("printhot") => print_hot(&conn, out_str),
+            Some("adduser") => create_user_test(words),
+            Some("addmeme") => create_meme_test(words),
+            Some("addtag") => create_tag_test(words),
+            Some("addmemetag") => add_meme_tag_test(words),
+            Some("upvote") => upvote_test(words),
+            Some("downvote") => downvote_test(words),
+            Some("delmeme") => delete_meme_test(words),
+            Some("print") => print_test(out_str),
+            Some("printuser") => print_users_test(out_str),
+            Some("printtags") => print_tag_test(out_str),
+            Some("printmeta") => print_meta_test(out_str),
+            Some("printhot") => print_hot(out_str),
             Some("help") => writeln!(out_str, "{}", HELPMESSAGE).map_err(|err|  format!("Error printing help message: {}", err)),
             _ => Err("Invalid command".to_owned()),
         };
@@ -269,27 +273,5 @@ pub fn switcher<R: BufRead, W: Write>(conn: &PgConnection, in_str: &mut R, out_s
         }
 
         input.truncate(0);
-    }
-}
-
-pub struct Cli {
-    conn: PgConnection,
-}
-
-impl Cli {
-    pub fn new() -> Cli {
-        let conn = establish_connection();
-        Cli{
-            conn
-        }
-    }
-    pub fn connection(&self) -> &PgConnection {
-        &self.conn
-    }
-}
-
-impl Default for Cli {
-    fn default() -> Self {
-        Self::new()
     }
 }
