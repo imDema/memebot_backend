@@ -1,7 +1,5 @@
 use dotenv::dotenv;
 use std::env;
-use diesel::PgConnection;
-use diesel::prelude::*;
 
 #[macro_export]
 macro_rules! conn {
@@ -18,6 +16,21 @@ lazy_static::lazy_static!{
     pub static ref POOL: Pool = establish_connection_pool();
 }
 
+///Read database url from .env and return a connection pool to it
+pub fn establish_connection_pool() -> Pool {
+    dotenv().ok();
+    
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
+    
+    let conn_man = diesel::r2d2::ConnectionManager::new(db_url);
+    
+    let pool = diesel::r2d2::Pool::new(conn_man)
+    .unwrap_or_else(|_| panic!("Error connecting to database"));
+    
+    embedded_migrations::run(&pool.clone().get().unwrap()).unwrap();
+    pool
+}
+
 // ///Read database url from .env and connect to it
 // pub fn establish_connection() -> PgConnection {
 //     dotenv().ok();
@@ -30,18 +43,3 @@ lazy_static::lazy_static!{
 //     embedded_migrations::run(&conn).unwrap();
 //     conn
 // }
-
-///Read database url from .env and return a connection pool to it
-pub fn establish_connection_pool() -> Pool {
-    dotenv().ok();
-
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env !");
-
-    let conn_man = diesel::r2d2::ConnectionManager::new(db_url);
-    
-    let pool = diesel::r2d2::Pool::new(conn_man)
-        .unwrap_or_else(|_| panic!("Error connecting to database"));
-
-    embedded_migrations::run(&pool.clone().get().unwrap()).unwrap();
-    pool
-}
