@@ -12,10 +12,10 @@ enum Order {
     Rating,
 }
 
-enum Range {
-    All,
-    In(usize,usize),
-}
+// enum Range {
+//     All,
+//     In(usize,usize),
+// }
 
 enum Filter {
     None,
@@ -25,7 +25,7 @@ enum Filter {
 
 pub struct MemeQuery {
     order: Order,
-    range: Range,
+    // range: Range,
     filter: Filter,
 }
 
@@ -33,7 +33,7 @@ impl MemeQuery {
     pub fn new() -> Self {
         MemeQuery{
             order: Order::None,
-            range: Range::All,
+            // range: Range::All,
             filter: Filter::None,
         }
     }
@@ -48,10 +48,10 @@ impl MemeQuery {
         self
     }
 
-    fn range(mut self, from: usize, to: usize) -> Self { //TODO make public
-        self.range = Range::In(from, to);
-        self
-    }
+    // fn range(mut self, from: usize, to: usize) -> Self { //TODO make public
+    //     self.range = Range::In(from, to);
+    //     self
+    // }
 
     pub fn order_hot(mut self) -> Self {
         self.order = Order::Heat;
@@ -91,16 +91,13 @@ impl MemeQuery {
         let now = Local::now().naive_local();
         match self.order {
             Order::None => (),
-            Order::Date => filtered.sort_unstable_by_key(|a| a.posted_at),
+            Order::Date => filtered.sort_unstable_by(|a, b| b.posted_at.cmp(&a.posted_at)),
             Order::Heat => filtered.sort_unstable_by(|a, b| 
-                heat_decay(a.heat, a.last_action, now).partial_cmp(&heat_decay(b.heat, b.last_action, now)).unwrap()),
-            Order::Rating => filtered.sort_unstable_by(|a, b| a.score.partial_cmp(&b.score).unwrap()),
+                heat_decay(b.heat, b.last_action, now).partial_cmp(&heat_decay(a.heat, a.last_action, now)).unwrap()),
+            Order::Rating => filtered.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap()),
         };
-        
-        match self.range {
-            Range::All => Ok(filtered),
-            Range::In(_from, _to) =>Ok(filtered), //TODO change this
-        }
-        
+
+        Ok(filtered)
+        //TODO change this
     }
 }
