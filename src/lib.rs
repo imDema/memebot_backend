@@ -15,6 +15,7 @@ pub mod models;
 pub mod rating;
 pub mod schema;
 pub mod cli;
+pub mod meme_query;
 mod db;
 
 /// Add a new user with username `username` to database
@@ -225,7 +226,7 @@ pub fn add_meme_tag(memeid: i32, tagid: i32) -> QueryResult<()> {
 pub fn memes_by_tagid(tagid: i32) -> QueryResult<Vec<Meme>> {
     let conn = conn!();
     memes::dsl::memes
-        .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::dsl::tags))
+        .inner_join(meme_tags::table.inner_join(tags::table))
         .filter(tags::tagid.eq(tagid))
         .select((
             memes::memeid,
@@ -245,7 +246,7 @@ pub fn memes_by_tagid(tagid: i32) -> QueryResult<Vec<Meme>> {
 pub fn memes_by_tag_score_ordered(tagid: i32) -> QueryResult<Vec<Meme>> {
     let conn = conn!();
     memes::dsl::memes
-        .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::dsl::tags))
+        .inner_join(meme_tags::dsl::meme_tags.inner_join(tags::table))
         .filter(tags::tagid.eq(tagid))
         .select((
             memes::memeid,
