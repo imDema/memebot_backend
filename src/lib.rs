@@ -82,7 +82,7 @@ fn create_action(conn: &PgConnection, action: NewAction) -> QueryResult<(i32, i3
             .filter(memes::memeid.eq(action.memeid))
             .set((
                 memes::heat
-                    .eq(rating::heat_decay(currheat, last_action, now) + rating::HEAT_POS_INCREASE),
+                    .eq(rating::heat_decay(&currheat, &last_action, &now) + rating::HEAT_POS_INCREASE),
                 memes::last_action.eq(now),
             ))
             .execute(conn)?;
@@ -271,7 +271,7 @@ pub fn memes_by_heat(quantity: usize) -> QueryResult<Vec<Meme>> {
     let now = Local::now().naive_local();
     
     allmemes.iter_mut()
-        .for_each(|mut meme| meme.heat = rating::heat_decay(meme.heat, meme.last_action, now));
+        .for_each(|mut meme| meme.heat = rating::heat_decay(&meme.heat, &meme.last_action, &now));
 
     allmemes.sort_unstable_by(|b, a| {
         a.heat

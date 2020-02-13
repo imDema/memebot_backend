@@ -1,6 +1,7 @@
 use chrono::prelude::*;
 
 use super::schema::*;
+use super::rating::heat_decay;
 
 use serde_derive::{Serialize, Deserialize};
 
@@ -15,6 +16,14 @@ pub struct Meme {
     pub heat: f32,
     pub last_action: NaiveDateTime,
     pub posted_at: NaiveDateTime,
+}
+
+impl Meme {
+    pub fn update_heat(&mut self, now: &NaiveDateTime) {
+        let h0 = self.heat;
+        self.heat = heat_decay(&h0, &self.last_action, now);
+        self.last_action = *now;
+    }
 }
 
 #[derive(Queryable, Serialize, Debug)]

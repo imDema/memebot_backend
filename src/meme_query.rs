@@ -1,6 +1,5 @@
 use crate::schema::{memes, meme_tags};
 use crate::models::Meme;
-use crate::rating::heat_decay;
 use crate::db::POOL;
 use diesel::prelude::*;
 use chrono::prelude::*;
@@ -92,8 +91,10 @@ impl MemeQuery {
         match self.order {
             Order::None => (),
             Order::Date => filtered.sort_unstable_by(|a, b| b.posted_at.cmp(&a.posted_at)),
-            Order::Heat => filtered.sort_unstable_by(|a, b| 
-                heat_decay(b.heat, b.last_action, now).partial_cmp(&heat_decay(a.heat, a.last_action, now)).unwrap()),
+            Order::Heat => {
+                filtered.iter_mut().for_each(|m| m.update_heat(&now));
+                filtered.sort_unstable_by(|a, b| b.heat.partial_cmp(&a.heat).unwrap())
+            },
             Order::Rating => filtered.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap()),
         };
 
